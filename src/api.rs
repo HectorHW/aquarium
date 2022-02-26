@@ -193,3 +193,28 @@ pub fn tick(state: &AMState) -> impl warp::Reply {
     world.tick();
     warp::reply()
 }
+
+pub fn set_setting(state: &AMState, key: String, value: usize) -> impl warp::Reply {
+    let mut state = state.lock();
+    match key.as_str() {
+        "mutation_chance" => {
+            state.world.config.mutation_chance = value;
+        }
+
+        "max_cell_size" => {
+            state.world.config.max_cell_size = value;
+        }
+
+        "max_minerals" => {
+            state.world.config.max_cell_size = value;
+        }
+
+        other => {
+            return warp::reply::with_status(
+                format!("parameter not found: {}", other),
+                StatusCode::BAD_REQUEST,
+            );
+        }
+    }
+    warp::reply::with_status("ok".to_string(), StatusCode::OK)
+}

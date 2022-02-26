@@ -32,7 +32,7 @@ async fn main() {
             }
         },
         light_behaviour: |i| 7usize.saturating_sub(i / 2),
-        mutation_chance: 15,
+        mutation_chance: 5,
         max_cell_size: 400,
         minerals_behaviour: |i| {
             let distance_from_bottom = 20 - i - 1;
@@ -88,5 +88,5 @@ async fn main() {
 
     let routes = routes::build_routes(state);
     println!("http://127.0.0.1:8000");
-    warp::serve(routes).run(([127, 0, 0, 1], 8000)).await;
+    warp::serve(routes).run(([0, 0, 0, 0], 8000)).await;
 }

@@ -46,8 +46,13 @@ pub fn build_routes(
     });
 
     let tick = warp::path!("tick").map({
-        let state = state;
+        let state = state.clone();
         move || api::tick(&state)
+    });
+
+    let set_setting = warp::path!("set-config").and(warp::body::json()).map({
+        let state = state;
+        move |(k, v)| api::set_setting(&state, k, v)
     });
 
     warp::get()
@@ -57,6 +62,7 @@ pub fn build_routes(
                 .or(set_tps)
                 .or(spawn_random)
                 .or(spawn_green)
-                .or(tick),
+                .or(tick)
+                .or(set_setting),
         ))
 }
