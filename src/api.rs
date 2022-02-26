@@ -65,6 +65,13 @@ pub fn main_page(state: &AMState) -> Html<String> {
     context.insert("table", &table);
     let step_count = state.world.total_steps.to_string();
     context.insert("steps", &step_count);
+    context.insert(
+        "tps",
+        &format!(
+            "tps: {} (measured at {:?})",
+            state.stats.measured_tps, state.stats.measure_point
+        ),
+    );
 
     warp::reply::html(tera.render("index", &context).unwrap())
 }
@@ -107,7 +114,7 @@ pub fn pause(state: &AMState) -> Response<String> {
 }
 
 pub fn set_tps(state: &AMState, tps: u64) -> impl warp::Reply {
-    if !(1..=1000000).contains(&tps) {
+    if !(0..=1000).contains(&tps) {
         return warp::reply::with_status(
             format!("invalid tps value {}", tps),
             StatusCode::BAD_REQUEST,
@@ -115,7 +122,7 @@ pub fn set_tps(state: &AMState, tps: u64) -> impl warp::Reply {
     }
 
     let mut state = state.lock();
-    state.tps = tps;
+    state.target_tps = tps;
 
     warp::reply::with_status(format!("set tps to {tps}"), StatusCode::OK)
 }
@@ -143,4 +150,9 @@ pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
             StatusCode::BAD_REQUEST,
         ),
     }
+}
+
+pub fn stats(state: &AMState) -> Json {
+    let state = state.lock();
+    warp::reply::json(&state.stats.as_dict())
 }

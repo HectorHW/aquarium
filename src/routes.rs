@@ -26,11 +26,16 @@ pub fn build_routes(
     });
 
     let inspect = warp::path!("inspect" / usize / usize).map({
-        let state = state;
+        let state = state.clone();
         move |i, j| api::inspect(&state, (i, j))
     });
 
+    let stats = warp::path!("stats").map({
+        let state = state;
+        move || api::stats(&state)
+    });
+
     warp::get()
-        .and(serve_page.or(serve_world_json).or(inspect))
+        .and(serve_page.or(serve_world_json).or(inspect).or(stats))
         .or(warp::post().and(pause_world.or(set_tps)))
 }

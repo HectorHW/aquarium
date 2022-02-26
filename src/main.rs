@@ -2,6 +2,7 @@ extern crate rand;
 
 use std::sync::Arc;
 
+use std::thread;
 use std::time::Duration;
 use tokio::task;
 
@@ -13,6 +14,7 @@ mod state;
 use state::ServerState;
 
 use crate::cells::world::WorldConfig;
+use crate::state::SpeedMeasure;
 
 mod routes;
 
@@ -38,7 +40,8 @@ async fn main() {
         world.populate(200).unwrap();
         ServerState {
             paused: false,
-            tps: 1000000,
+            target_tps: 0,
+            stats: SpeedMeasure::new(),
             world,
         }
     }));
@@ -46,17 +49,33 @@ async fn main() {
     {
         let state = state.clone();
 
-        task::spawn(async move {
-            let mut tps = 1000000;
+        task::spawn_blocking(move || {
+            let mut tps = 0;
             loop {
-                tokio::time::sleep(Duration::from_micros(1000000 / tps)).await;
+                if tps != 0 {
+                    thread::sleep(Duration::from_millis(1000 / tps));
+                }
+
                 let mut state = state.lock();
 
                 if !state.paused {
                     let world = &mut state.world;
                     world.tick();
                 }
-                tps = state.tps;
+                tps = state.target_tps;
+            }
+        })
+    };
+
+    {
+        let state = state.clone();
+        task::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                let mut state = state.lock();
+                {
+                    state.take_measure();
+                }
             }
         })
     };
@@ -65,14 +84,3 @@ async fn main() {
     println!("http://127.0.0.1:8000");
     warp::serve(routes).run(([127, 0, 0, 1], 8000)).await;
 }
-
-/*fn main() {
-    let mut world: World = World::empty::<5, 5>(100);
-    world.populate(10).unwrap();
-
-    for i in 0..10 {
-        world.tick();
-
-        println!("{i}\n{}", world);
-    }
-}*/
