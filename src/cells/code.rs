@@ -151,14 +151,17 @@ impl Display for Program {
                                 format!("flip register {from}")
                             }
                             OpCode::JumpUnconditional(shift) => {
-                                format!("jump {shift}")
+                                format!(
+                                    "jump {shift} (to {})",
+                                    (idx + *shift as usize) % self.0.len()
+                                )
                             }
                             OpCode::SkipZero(addr) => {
                                 let addr = addr.unwrap();
                                 format!("skip if register {addr} is 0")
                             }
                             OpCode::MoveRelative => {
-                                "move forward".to_string()
+                                "move relative".to_string()
                             }
                             OpCode::LookRelative(addr) => {
                                 let addr = addr.unwrap();
