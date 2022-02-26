@@ -2,6 +2,7 @@ extern crate rand;
 
 use std::sync::Arc;
 
+use num::Saturating;
 use std::thread;
 use std::time::Duration;
 use tokio::task;
@@ -23,9 +24,9 @@ async fn main() {
     let config = WorldConfig {
         start_energy: 40,
         dead_energy: 20,
-        split_behaviour: |i| {
-            if i > 80 {
-                Ok(i / 2)
+        split_behaviour: |energy, minerals| {
+            if energy > 80 {
+                Ok((energy / 2, minerals / 2))
             } else {
                 Err(())
             }
@@ -33,11 +34,16 @@ async fn main() {
         light_behaviour: |i| 7usize.saturating_sub(i / 2),
         mutation_chance: 15,
         max_cell_size: 400,
+        minerals_behaviour: |i| {
+            let distance_from_bottom = 20 - i - 1;
+            7.saturating_sub(distance_from_bottom / 2)
+        },
+        max_minerals: 100,
     };
 
     let state = Arc::new(parking_lot::Mutex::new({
         let mut world = World::empty::<40, 20>(config);
-        world.populate(200).unwrap();
+        world.populate_green(200).unwrap();
         ServerState {
             paused: false,
             target_tps: 0,

@@ -31,11 +31,32 @@ pub fn build_routes(
     });
 
     let stats = warp::path!("stats").map({
-        let state = state;
+        let state = state.clone();
         move || api::stats(&state)
+    });
+
+    let spawn_random = warp::path!("spawn-random").and(warp::body::json()).map({
+        let state = state.clone();
+        move |n| api::spawn_random(&state, n)
+    });
+
+    let spawn_green = warp::path!("spawn-green").and(warp::body::json()).map({
+        let state = state.clone();
+        move |n| api::spawn_green(&state, n)
+    });
+
+    let tick = warp::path!("tick").map({
+        let state = state;
+        move || api::tick(&state)
     });
 
     warp::get()
         .and(serve_page.or(serve_world_json).or(inspect).or(stats))
-        .or(warp::post().and(pause_world.or(set_tps)))
+        .or(warp::post().and(
+            pause_world
+                .or(set_tps)
+                .or(spawn_random)
+                .or(spawn_green)
+                .or(tick),
+        ))
 }

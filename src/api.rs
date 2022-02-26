@@ -9,8 +9,8 @@ use crate::{cells::world::WorldCell, state::AMState};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum SerializedCell {
-    Alive { mass: usize },
-    Dead,
+    Alive { energy: usize, minerals: usize },
+    Dead { energy: usize, minerals: usize },
     Empty,
 }
 
@@ -37,10 +37,14 @@ pub fn main_page(state: &AMState) -> Html<String> {
                             "<td>{}</td>",
                             match item {
                                 WorldCell::Organism(o) => {
-                                    format!("<a href=/inspect/{i}/{j}>{}</a>", o.get_energy())
+                                    format!(
+                                        "<a href=/inspect/{i}/{j}>{} {}</a>",
+                                        o.get_energy(),
+                                        o.get_minerals()
+                                    )
                                 }
-                                WorldCell::DeadBody(_) => {
-                                    "d".to_string()
+                                WorldCell::DeadBody(_e, m) => {
+                                    format!("[{}]", m)
                                 }
 
                                 WorldCell::Empty => {
@@ -89,9 +93,13 @@ pub fn get_map(state: &AMState) -> Json {
                     .map(|cell| match cell {
                         WorldCell::Empty => SerializedCell::Empty,
                         WorldCell::Organism(o) => SerializedCell::Alive {
-                            mass: o.get_energy(),
+                            energy: o.get_energy(),
+                            minerals: o.get_minerals(),
                         },
-                        WorldCell::DeadBody(_) => SerializedCell::Dead,
+                        WorldCell::DeadBody(energy, minerals) => SerializedCell::Dead {
+                            energy: *energy,
+                            minerals: *minerals,
+                        },
                     })
                     .collect()
             })
@@ -155,4 +163,33 @@ pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
 pub fn stats(state: &AMState) -> Json {
     let state = state.lock();
     warp::reply::json(&state.stats.as_dict())
+}
+
+pub fn spawn_random(state: &AMState, bots: usize) -> impl warp::Reply {
+    let mut state = state.lock();
+    let world = &mut state.world;
+    match world.populate_random(bots) {
+        Ok(_) => warp::reply::with_status("".to_string(), StatusCode::CREATED),
+        Err(n) => {
+            warp::reply::with_status(format!("failed to add {} bots", n), StatusCode::CONFLICT)
+        }
+    }
+}
+
+pub fn spawn_green(state: &AMState, bots: usize) -> impl warp::Reply {
+    let mut state = state.lock();
+    let world = &mut state.world;
+    match world.populate_green(bots) {
+        Ok(_) => warp::reply::with_status("".to_string(), StatusCode::CREATED),
+        Err(n) => {
+            warp::reply::with_status(format!("failed to add {} bots", n), StatusCode::CONFLICT)
+        }
+    }
+}
+
+pub fn tick(state: &AMState) -> impl warp::Reply {
+    let mut state = state.lock();
+    let world = &mut state.world;
+    world.tick();
+    warp::reply()
 }

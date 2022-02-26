@@ -9,17 +9,19 @@ use super::organism::{Direction, Organism, OrganismAction};
 pub struct WorldConfig {
     pub start_energy: usize,
     pub dead_energy: usize,
-    pub split_behaviour: fn(usize) -> Result<usize, ()>,
+    pub split_behaviour: fn(usize, usize) -> Result<(usize, usize), ()>,
     pub light_behaviour: fn(usize) -> usize,
+    pub minerals_behaviour: fn(usize) -> usize,
     pub mutation_chance: usize,
     pub max_cell_size: usize,
+    pub max_minerals: usize,
 }
 
 #[derive(Clone, Debug)]
 pub enum WorldCell {
     Empty,
     Organism(Box<Organism>),
-    DeadBody(usize),
+    DeadBody(usize, usize),
 }
 
 pub struct World {
@@ -55,7 +57,11 @@ impl World {
         res
     }
 
-    pub fn populate(&mut self, mut number_of_bots: usize) -> Result<(), usize> {
+    fn populate(
+        &mut self,
+        mut number_of_bots: usize,
+        bot_factory: fn(usize) -> Organism,
+    ) -> Result<(), usize> {
         let mut free_cells = self.get_free_cells();
 
         free_cells.shuffle(&mut thread_rng());
@@ -65,7 +71,7 @@ impl World {
                 break;
             }
 
-            let organism = Organism::green(self.config.start_energy);
+            let organism = bot_factory(self.config.start_energy);
 
             self.field[i][j] = WorldCell::Organism(Box::new(organism));
             number_of_bots -= 1;
@@ -76,6 +82,14 @@ impl World {
         } else {
             Ok(())
         }
+    }
+
+    pub fn populate_green(&mut self, number_of_bots: usize) -> Result<(), usize> {
+        self.populate(number_of_bots, Organism::green)
+    }
+
+    pub fn populate_random(&mut self, number_of_bots: usize) -> Result<(), usize> {
+        self.populate(number_of_bots, Organism::random)
     }
 
     pub fn get_width(&self) -> usize {
@@ -139,6 +153,11 @@ impl World {
         (self.config.light_behaviour)(i)
     }
 
+    pub fn get_minerals(&self, i: usize) -> usize {
+        (self.config.minerals_behaviour)(i)
+    }
+
+    #[inline]
     fn process_bot(&mut self, (i, j): (usize, usize), mut bot: Box<Organism>) {
         match bot.tick(self, (i, j)) {
             Some(OrganismAction::TryEat(direction)) => {
@@ -149,17 +168,18 @@ impl World {
                     {
                         let energy = other.get_energy();
 
-                        bot.eat_sucessful(energy.saturating_sub(dead_energy));
-                        other.decrease_energy(energy);
+                        bot.add_energy(energy.saturating_sub(dead_energy));
+                        *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
                     }
 
                     Some(cell @ &mut WorldCell::DeadBody(..)) => {
-                        let acquired_energy = match &cell {
-                            WorldCell::DeadBody(n) => *n,
+                        let (energy, minerals) = match &cell {
+                            WorldCell::DeadBody(e, m) => (*e, *m),
                             _ => unreachable!(),
                         };
                         *cell = WorldCell::Empty;
-                        bot.eat_sucessful(acquired_energy);
+                        bot.add_energy(energy);
+                        bot.add_minerals(minerals, self.config.max_minerals);
                     }
 
                     _any_other_case => {}
@@ -178,11 +198,13 @@ impl World {
             }
 
             Some(OrganismAction::Die) => {
-                self.field[i][j] = WorldCell::DeadBody(self.config.dead_energy);
+                self.field[i][j] = WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
             }
 
-            Some(OrganismAction::TryClone(child_size, direction)) => {
-                if let Some(child) = bot.split_off(child_size, self.config.mutation_chance) {
+            Some(OrganismAction::TryClone(child_size, child_minerals, direction)) => {
+                if let Some(child) =
+                    bot.split_off(child_size, child_minerals, self.config.mutation_chance)
+                {
                     if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
                         let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
                         self.field[new_i][new_j] = WorldCell::Organism(child);
@@ -192,17 +214,36 @@ impl World {
                 self.field[i][j] = WorldCell::Organism(bot);
             }
 
+            Some(OrganismAction::ShareEnergy(amount, direction)) => {
+                match self.look_relative_mut((i, j), direction) {
+                    Some(WorldCell::DeadBody(ref mut n, _)) => *n += amount,
+                    Some(WorldCell::Organism(ref mut o)) => o.add_energy(amount),
+                    Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(amount, 0),
+                    None => {}
+                }
+            }
+
+            Some(OrganismAction::ShareMinerals(amount, direction)) => {
+                let max_minerals = self.config.max_minerals;
+                match self.look_relative_mut((i, j), direction) {
+                    Some(WorldCell::DeadBody(_, ref mut n)) => *n += amount,
+                    Some(WorldCell::Organism(ref mut o)) => o.add_minerals(amount, max_minerals),
+                    Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(0, amount),
+                    None => {}
+                }
+            }
+
             None => {
-                let child = if let (Ok(child_size), false) = (
-                    (self.config.split_behaviour)(bot.get_energy()),
+                let child = if let (Ok((child_size, child_minerals)), false) = (
+                    (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals()),
                     bot.can_clone,
                 ) {
-                    bot.split_off(child_size, self.config.mutation_chance)
+                    bot.split_off(child_size, child_minerals, self.config.mutation_chance)
                 } else if bot.get_energy() > self.config.max_cell_size {
-                    bot.split_off(
-                        (self.config.split_behaviour)(bot.get_energy()).unwrap(),
-                        self.config.mutation_chance,
-                    )
+                    let (energy, minerals) =
+                        (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals())
+                            .unwrap();
+                    bot.split_off(energy, minerals, self.config.mutation_chance)
                 } else {
                     None
                 };

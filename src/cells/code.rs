@@ -57,6 +57,10 @@ pub enum OpCode {
     Clone(u8),
     Compare(PackedAddress),
 
+    CollectMinerals,
+    UseMinerals(PackedAddress),
+    Share(PackedAddress),
+    ShareMinerals(PackedAddress),
     Sythesize,
 }
 
@@ -64,7 +68,7 @@ impl Distribution<OpCode> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> OpCode {
         use OpCode::*;
         let param: u8 = rng.gen();
-        match rng.gen_range(0..=13) {
+        match rng.gen_range(0..=17) {
             0 => LoadInt(param),
             1 => CopyRegisters(param.into()),
             2 => Add(param.into()),
@@ -79,6 +83,11 @@ impl Distribution<OpCode> for Standard {
             10 => OpCode::Eat,
             11 => Clone(param),
             12 => Compare(param.into()),
+            13 => CollectMinerals,
+            14 => UseMinerals(param.into()),
+            15 => Share(param.into()),
+            16 => ShareMinerals(param.into()),
+
             _ => OpCode::Sythesize,
         }
     }
@@ -163,6 +172,13 @@ impl Display for Program {
                             OpCode::Sythesize => "photosynthesize".to_string(),
                             OpCode::Compare(t) =>
                                 format!("compare and put result in register {}", t.unwrap()),
+                            OpCode::CollectMinerals => "collect minerals".to_string(),
+                            OpCode::UseMinerals(n) =>
+                                format!("use minerals by register {}", n.unwrap()),
+                            OpCode::Share(addr) =>
+                                format!("share nergy using register {} as value", addr.unwrap()),
+                            OpCode::ShareMinerals(addr) =>
+                                format!("share minerals using register {} as value", addr.unwrap()),
                         }
                     )
                 })

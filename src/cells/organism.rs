@@ -51,7 +51,9 @@ pub enum OrganismAction {
     TryMove(Direction),
     TryEat(Direction),
     Die,
-    TryClone(usize, Direction),
+    TryClone(usize, usize, Direction),
+    ShareEnergy(usize, Direction),
+    ShareMinerals(usize, Direction),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -61,6 +63,7 @@ pub struct Organism {
     ip: usize,
 
     energy: usize,
+    stored_minerals: usize,
     pub can_clone: bool,
 }
 
@@ -77,16 +80,17 @@ impl Organism {
             can_clone: code.0.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
             code,
             energy,
+            stored_minerals: 0,
             ip: 0,
         }
     }
 
     pub fn green(energy: usize) -> Self {
         let program = Program([OpCode::Sythesize; 256]);
-        Self::with_program(energy, program)
+        Self::with_program(energy, 0, program)
     }
 
-    fn with_program(energy: usize, program: Program) -> Self {
+    fn with_program(energy: usize, minerals: usize, program: Program) -> Self {
         Organism {
             ///registers
             /// 0 - result register - observing instructions will put result here
@@ -100,12 +104,17 @@ impl Organism {
                 .any(|gene| matches!(gene, OpCode::Clone(..))),
             code: program,
             energy,
+            stored_minerals: minerals,
             ip: 0,
         }
     }
 
+    #[inline]
     pub fn tick(&mut self, world: &World, (i, j): (usize, usize)) -> Option<OrganismAction> {
         self.registers[2] = thread_rng().gen();
+        self.registers[3] = i.min(255usize) as u8;
+        self.registers[4] = self.get_minerals().min(255usize) as u8;
+        self.registers[5] = self.get_energy().min(255usize) as u8;
 
         if self.energy == 0 {
             return Some(OrganismAction::Die);
@@ -137,7 +146,7 @@ impl Organism {
                     Some(super::world::WorldCell::Empty) => 0,
 
                     Some(super::world::WorldCell::Organism(_)) => 1,
-                    Some(super::world::WorldCell::DeadBody(_)) => 2,
+                    Some(super::world::WorldCell::DeadBody(..)) => 2,
                     None => 255,
                 };
                 None
@@ -152,6 +161,15 @@ impl Organism {
                 self.energy += generated;
                 None
             }
+
+            OpCode::CollectMinerals => {
+                self.ip += 1;
+                let generated = world.get_minerals(i);
+                self.stored_minerals =
+                    (self.stored_minerals + generated).min(world.config.max_minerals);
+                None
+            }
+
             OpCode::Add(addr) => {
                 self.ip += 1;
                 let (from, to) = addr.unwrap();
@@ -194,7 +212,13 @@ impl Organism {
                     self.energy * inherit_rate as usize / 256usize,
                 );
 
-                Some(OrganismAction::TryClone(child_energy, self.get_direction()))
+                let child_minerals = self.stored_minerals * inherit_rate as usize / 256usize;
+
+                Some(OrganismAction::TryClone(
+                    child_energy,
+                    child_minerals,
+                    self.get_direction(),
+                ))
             }
             OpCode::Compare(addr) => {
                 self.ip += 1;
@@ -215,14 +239,44 @@ impl Organism {
                 };
                 None
             }
+
+            OpCode::UseMinerals(n) => {
+                let mineral_energy =
+                    (self.registers[n.unwrap()] as usize).min(self.stored_minerals);
+                self.energy += mineral_energy;
+                self.stored_minerals -= mineral_energy;
+                None
+            }
+            OpCode::Share(addr) => {
+                let share_value = usize::min(self.registers[addr.unwrap()] as usize, self.energy);
+                self.energy -= share_value;
+                Some(OrganismAction::ShareEnergy(
+                    share_value,
+                    self.get_direction(),
+                ))
+            }
+
+            OpCode::ShareMinerals(addr) => {
+                let share_value =
+                    usize::min(self.registers[addr.unwrap()] as usize, self.stored_minerals);
+                self.stored_minerals -= share_value;
+                Some(OrganismAction::ShareMinerals(
+                    share_value,
+                    self.get_direction(),
+                ))
+            }
         };
 
         self.ip %= self.code.0.len();
         res
     }
 
-    pub fn eat_sucessful(&mut self, energy: usize) {
+    pub fn add_energy(&mut self, energy: usize) {
         self.energy += energy;
+    }
+
+    pub fn add_minerals(&mut self, minerals: usize, limit: usize) {
+        self.stored_minerals = (self.stored_minerals + minerals).min(limit);
     }
 
     fn get_direction(&self) -> Direction {
@@ -237,15 +291,21 @@ impl Organism {
         self.energy
     }
 
-    pub fn decrease_energy(&mut self, amount: usize) {
-        self.energy = self.energy.saturating_sub(amount);
+    pub fn get_minerals(&self) -> usize {
+        self.stored_minerals
     }
 
-    pub fn split_off(&mut self, energy: usize, mutation_chance: usize) -> Option<Box<Organism>> {
+    pub fn split_off(
+        &mut self,
+        energy: usize,
+        minerals: usize,
+        mutation_chance: usize,
+    ) -> Option<Box<Organism>> {
         if self.energy > energy {
             let child_program = self.code.clone_lossy(mutation_chance);
-            let child = Box::new(Self::with_program(energy, child_program));
+            let child = Box::new(Self::with_program(energy, minerals, child_program));
             self.energy -= energy;
+            self.stored_minerals -= minerals;
             Some(child)
         } else {
             None
