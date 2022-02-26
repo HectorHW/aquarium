@@ -55,6 +55,11 @@ pub fn build_routes(
         move |(k, v)| api::set_setting(&state, k, v)
     });
 
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_headers(vec!["*"])
+        .allow_methods(vec!["GET", "POST"]);
+
     warp::get()
         .and(serve_page.or(serve_world_json).or(inspect).or(stats))
         .or(warp::post().and(
@@ -65,4 +70,5 @@ pub fn build_routes(
                 .or(tick)
                 .or(set_setting),
         ))
+        .with(cors)
 }
