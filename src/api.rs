@@ -162,7 +162,12 @@ pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
 
 pub fn stats(state: &AMState) -> Json {
     let state = state.lock();
-    warp::reply::json(&state.stats.as_dict())
+    let mut stats = state.stats.as_dict();
+    stats.insert(
+        "is_paused",
+        if state.paused { "1" } else { "0" }.to_string(),
+    );
+    warp::reply::json(&stats)
 }
 
 pub fn spawn_random(state: &AMState, bots: usize) -> impl warp::Reply {
