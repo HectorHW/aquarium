@@ -67,6 +67,12 @@ pub struct Organism {
     pub can_clone: bool,
 }
 
+fn random_registers() -> [u8; 16] {
+    let mut res = [0; 16];
+    thread_rng().fill(&mut res);
+    res
+}
+
 impl Organism {
     pub fn random(energy: usize) -> Self {
         let code = Program::random_program();
@@ -76,7 +82,7 @@ impl Organism {
             /// 1 - directional register - will store current bot direction
             /// 2 - random value - regenerated on every tick
             /// 3..15 - unassigned
-            registers: [0; 16],
+            registers: random_registers(),
             can_clone: code.0.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
             code,
             energy,
@@ -97,7 +103,7 @@ impl Organism {
             /// 1 - directional register - will store current bot direction
             /// 2 - random value - regenerated on every tick
             /// 3..15 - unassigned
-            registers: [0; 16],
+            registers: random_registers(),
             can_clone: program
                 .0
                 .iter()
@@ -243,7 +249,7 @@ impl Organism {
             OpCode::UseMinerals(n) => {
                 let mineral_energy =
                     (self.registers[n.unwrap()] as usize).min(self.stored_minerals);
-                self.energy += mineral_energy;
+                self.energy += mineral_energy * 2;
                 self.stored_minerals -= mineral_energy;
                 None
             }
