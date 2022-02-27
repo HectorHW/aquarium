@@ -168,14 +168,6 @@ impl Organism {
                 None
             }
 
-            OpCode::CollectMinerals => {
-                self.ip += 1;
-                let generated = world.get_minerals(i);
-                self.stored_minerals =
-                    (self.stored_minerals + generated).min(world.config.max_minerals);
-                None
-            }
-
             OpCode::Add(addr) => {
                 self.ip += 1;
                 let (from, to) = addr.unwrap();
@@ -249,7 +241,7 @@ impl Organism {
             OpCode::UseMinerals(n) => {
                 let mineral_energy =
                     (self.registers[n.unwrap()] as usize).min(self.stored_minerals);
-                self.energy += mineral_energy * 2;
+                self.energy += mineral_energy * 4;
                 self.stored_minerals -= mineral_energy;
                 None
             }

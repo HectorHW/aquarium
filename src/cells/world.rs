@@ -158,7 +158,15 @@ impl World {
     }
 
     #[inline]
+    fn run_bot_prelude(&mut self, (i, _j): (usize, usize), bot: &mut Organism) {
+        let minerals = self.get_minerals(i);
+        bot.add_minerals(minerals, self.config.max_minerals)
+    }
+
+    #[inline]
     fn process_bot(&mut self, (i, j): (usize, usize), mut bot: Box<Organism>) {
+        self.run_bot_prelude((i, j), bot.as_mut());
+
         match bot.tick(self, (i, j)) {
             Some(OrganismAction::TryEat(direction)) => {
                 let dead_energy = self.config.dead_energy;
@@ -168,7 +176,7 @@ impl World {
                     {
                         let energy = other.get_energy();
 
-                        bot.add_energy(energy.saturating_sub(dead_energy));
+                        bot.add_energy(energy.saturating_sub(dead_energy) / 2);
                         *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
                     }
 

@@ -57,7 +57,6 @@ pub enum OpCode {
     Clone(u8),
     Compare(PackedAddress),
 
-    CollectMinerals,
     UseMinerals(PackedAddress),
     Share(PackedAddress),
     ShareMinerals(PackedAddress),
@@ -83,10 +82,9 @@ impl Distribution<OpCode> for Standard {
             10 => OpCode::Eat,
             11 => Clone(param),
             12 => Compare(param.into()),
-            13 => CollectMinerals,
-            14 => UseMinerals(param.into()),
-            15 => Share(param.into()),
-            16 => ShareMinerals(param.into()),
+            13 => UseMinerals(param.into()),
+            14 => Share(param.into()),
+            15 => ShareMinerals(param.into()),
 
             _ => OpCode::Sythesize,
         }
@@ -175,7 +173,6 @@ impl Display for Program {
                             OpCode::Sythesize => "photosynthesize".to_string(),
                             OpCode::Compare(t) =>
                                 format!("compare and put result in register {}", t.unwrap()),
-                            OpCode::CollectMinerals => "collect minerals".to_string(),
                             OpCode::UseMinerals(n) =>
                                 format!("use minerals by register {}", n.unwrap()),
                             OpCode::Share(addr) =>
