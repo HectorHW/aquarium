@@ -272,6 +272,8 @@ impl World {
                                 WorldCell::DeadBody(bot.get_energy(), bot.get_minerals());
                         }
                     }
+                } else {
+                    self.field[i][j] = WorldCell::Organism(bot);
                 }
             }
         }
