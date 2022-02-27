@@ -10,6 +10,8 @@ pub fn build_routes(
         move || api::main_page(&state)
     });
 
+    let react_app = warp::fs::dir("front/build");
+
     let serve_world_json = warp::path!("world").map({
         let state = state.clone();
         move || api::get_map(&state)
@@ -58,9 +60,9 @@ pub fn build_routes(
     let cors = warp::cors()
         .allow_any_origin()
         .allow_headers(vec!["*"])
-        .allow_methods(vec!["GET", "POST"]);
+        .allow_methods(vec!["*"]);
 
-    warp::get()
+    let mappings = warp::get()
         .and(serve_page.or(serve_world_json).or(inspect).or(stats))
         .or(warp::post().and(
             pause_world
@@ -70,5 +72,7 @@ pub fn build_routes(
                 .or(tick)
                 .or(set_setting),
         ))
-        .with(cors)
+        .with(cors);
+
+    react_app.or(mappings)
 }

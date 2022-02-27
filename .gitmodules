@@ -1,0 +1,3 @@
+[submodule "aquarium-front"]
+	path = aquarium-front
+	url = https://github.com/HectorHW/aquarium-front
