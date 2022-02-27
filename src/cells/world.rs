@@ -216,10 +216,13 @@ impl World {
                     if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
                         let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
                         self.field[new_i][new_j] = WorldCell::Organism(child);
+                        self.field[i][j] = WorldCell::Organism(bot);
+                    } else {
+                        //bot dies if it cannot create a child when needed
+                        self.field[i][j] =
+                            WorldCell::DeadBody(bot.get_energy(), bot.get_minerals());
                     }
                 }
-
-                self.field[i][j] = WorldCell::Organism(bot);
             }
 
             Some(OrganismAction::ShareEnergy(amount, direction)) => {
@@ -229,6 +232,7 @@ impl World {
                     Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(amount, 0),
                     None => {}
                 }
+                self.field[i][j] = WorldCell::Organism(bot);
             }
 
             Some(OrganismAction::ShareMinerals(amount, direction)) => {
@@ -239,6 +243,7 @@ impl World {
                     Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(0, amount),
                     None => {}
                 }
+                self.field[i][j] = WorldCell::Organism(bot);
             }
 
             None => {
@@ -257,15 +262,22 @@ impl World {
                 };
 
                 if let Some(child) = child {
-                    self.try_place_bot((i, j), child);
-                }
+                    match self.try_place_bot((i, j), child) {
+                        Ok(()) => {
+                            self.field[i][j] = WorldCell::Organism(bot);
+                        }
 
-                self.field[i][j] = WorldCell::Organism(bot);
+                        Err(()) => {
+                            self.field[i][j] =
+                                WorldCell::DeadBody(bot.get_energy(), bot.get_minerals());
+                        }
+                    }
+                }
             }
         }
     }
 
-    fn try_place_bot(&mut self, (i, j): (usize, usize), bot: Box<Organism>) {
+    fn try_place_bot(&mut self, (i, j): (usize, usize), bot: Box<Organism>) -> Result<(), ()> {
         let mut directions = [
             Direction::Up,
             Direction::Down,
@@ -277,9 +289,10 @@ impl World {
             if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
                 let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
                 self.field[new_i][new_j] = WorldCell::Organism(bot);
-                return;
+                return Ok(());
             }
         }
+        Err(())
     }
 
     pub fn tick(&mut self) {
