@@ -1,110 +1,15 @@
-use serde::{Deserialize, Serialize};
-use tera::{Context, Tera};
 use warp::{
     hyper::{Response, StatusCode},
-    reply::{Html, Json},
+    reply::Json,
 };
 
-use crate::{cells::world::WorldCell, state::AMState};
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-enum SerializedCell {
-    Alive { energy: usize, minerals: usize },
-    Dead { energy: usize, minerals: usize },
-    Empty,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct SerializedWorld {
-    cells: Vec<Vec<SerializedCell>>,
-}
-
-pub fn main_page(state: &AMState) -> Html<String> {
-    let state = state.lock();
-    let world = &state.world;
-
-    let table_content = world
-        .field
-        .iter()
-        .enumerate()
-        .map(|(i, row)| {
-            format!(
-                "<tr>{}</tr>",
-                row.iter()
-                    .enumerate()
-                    .map(|(j, item)| {
-                        format!(
-                            "<td>{}</td>",
-                            match item {
-                                WorldCell::Organism(o) => {
-                                    format!(
-                                        "<a href=/inspect/{i}/{j}>{} {}</a>",
-                                        o.get_energy(),
-                                        o.get_minerals()
-                                    )
-                                }
-                                WorldCell::DeadBody(_e, m) => {
-                                    format!("[{}]", m)
-                                }
-
-                                WorldCell::Empty => {
-                                    " &nbsp; ".to_string()
-                                }
-                            }
-                        )
-                    })
-                    .collect::<String>()
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let table = format!("<table>{}</table>", table_content);
-
-    let mut tera = Tera::default();
-    tera.add_raw_template("index", include_str!("templates/index.html"))
-        .unwrap();
-
-    let mut context = Context::new();
-    context.insert("table", &table);
-    let step_count = state.world.total_steps.to_string();
-    context.insert("steps", &step_count);
-    context.insert(
-        "tps",
-        &format!(
-            "tps: {} (measured at {:?})",
-            state.stats.measured_tps, state.stats.measure_point
-        ),
-    );
-
-    warp::reply::html(tera.render("index", &context).unwrap())
-}
+use crate::{cells::world::WorldCell, serialization::store_world_shallow, state::AMState};
 
 pub fn get_map(state: &AMState) -> Json {
     let state = state.lock();
     let world = &state.world;
 
-    warp::reply::json(&SerializedWorld {
-        cells: world
-            .field
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|cell| match cell {
-                        WorldCell::Empty => SerializedCell::Empty,
-                        WorldCell::Organism(o) => SerializedCell::Alive {
-                            energy: o.get_energy(),
-                            minerals: o.get_minerals(),
-                        },
-                        WorldCell::DeadBody(energy, minerals) => SerializedCell::Dead {
-                            energy: *energy,
-                            minerals: *minerals,
-                        },
-                    })
-                    .collect()
-            })
-            .collect(),
-    })
+    warp::reply::json(&store_world_shallow(world))
 }
 
 pub fn pause(state: &AMState) -> Response<String> {
@@ -192,11 +97,11 @@ pub fn spawn_green(state: &AMState, bots: usize) -> impl warp::Reply {
     }
 }
 
-pub fn tick(state: &AMState) -> impl warp::Reply {
+pub fn tick(state: &AMState) -> Json {
     let mut state = state.lock();
     let world = &mut state.world;
     world.tick();
-    warp::reply()
+    warp::reply::json(&store_world_shallow(world))
 }
 
 pub fn set_setting(state: &AMState, key: String, value: usize) -> impl warp::Reply {

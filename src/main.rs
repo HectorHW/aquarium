@@ -18,6 +18,7 @@ use crate::cells::world::WorldConfig;
 use crate::state::SpeedMeasure;
 
 mod routes;
+mod serialization;
 
 #[tokio::main]
 async fn main() {

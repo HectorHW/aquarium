@@ -5,12 +5,7 @@ use crate::{api, state::AMState};
 pub fn build_routes(
     state: AMState,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone + 'static {
-    let serve_page = warp::path::end().map({
-        let state = state.clone();
-        move || api::main_page(&state)
-    });
-
-    let react_app = warp::fs::dir("front/build");
+    let react_app = warp::fs::dir("aquarium-front/build");
 
     let serve_world_json = warp::path!("world").map({
         let state = state.clone();
@@ -63,7 +58,7 @@ pub fn build_routes(
         .allow_methods(vec!["*"]);
 
     let mappings = warp::get()
-        .and(serve_page.or(serve_world_json).or(inspect).or(stats))
+        .and(serve_world_json.or(inspect).or(stats))
         .or(warp::post().and(
             pause_world
                 .or(set_tps)
