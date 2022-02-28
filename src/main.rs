@@ -32,19 +32,19 @@ async fn main() {
                 Err(())
             }
         },
-        light_behaviour: |i| 4usize.saturating_sub(i / 9),
+        light_behaviour: |i| 3usize.saturating_sub(i / 10),
         mutation_chance: 5,
-        max_cell_size: 400,
+        max_cell_size: 500,
         minerals_behaviour: |i| {
             let distance_from_bottom = 50 - i - 1;
-            4.saturating_sub(distance_from_bottom / 9)
+            3.saturating_sub(distance_from_bottom / 10)
         },
         max_minerals: 100,
     };
 
     let state = Arc::new(parking_lot::Mutex::new({
         let mut world = World::empty::<100, 50>(config);
-        world.populate_random(500).unwrap();
+        world.populate_green(500).unwrap();
         ServerState {
             paused: false,
             target_tps: 0,

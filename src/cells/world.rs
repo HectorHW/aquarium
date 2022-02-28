@@ -1,7 +1,7 @@
 use std::{fmt::Display, mem};
 
 use num_bigint::BigUint;
-use rand::{prelude::SliceRandom, thread_rng};
+use rand::{prelude::SliceRandom, thread_rng, Rng};
 
 use super::organism::{Direction, Organism, OrganismAction};
 
@@ -163,7 +163,7 @@ impl World {
         bot.add_minerals(minerals, self.config.max_minerals)
     }
 
-    #[inline]
+    #[inline(always)]
     fn process_bot(&mut self, (mut i, mut j): (usize, usize), mut bot: Box<Organism>) {
         self.run_bot_prelude((i, j), bot.as_mut());
 
@@ -171,13 +171,16 @@ impl World {
             Some(OrganismAction::TryEat(direction)) => {
                 let dead_energy = self.config.dead_energy;
                 match self.look_relative_mut((i, j), direction) {
-                    Some(&mut WorldCell::Organism(ref mut other))
-                        if bot.get_energy() >= other.get_energy() =>
-                    {
+                    Some(&mut WorldCell::Organism(ref mut other)) => {
                         let energy = other.get_energy();
 
-                        bot.add_energy(energy.saturating_sub(dead_energy) / 2);
-                        *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
+                        if mass_to_chance(bot.get_energy(), energy) {
+                            bot.add_energy(
+                                energy.saturating_sub(dead_energy) / 2,
+                                self.config.max_cell_size,
+                            );
+                            *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
+                        }
                     }
 
                     Some(cell @ &mut WorldCell::DeadBody(..)) => {
@@ -186,8 +189,8 @@ impl World {
                             _ => unreachable!(),
                         };
                         *cell = WorldCell::Empty;
-                        bot.add_energy(energy);
-                        bot.add_minerals(minerals, self.config.max_minerals);
+                        bot.add_energy(energy / 2, self.config.max_cell_size);
+                        bot.add_minerals(minerals / 2, self.config.max_minerals);
                     }
 
                     _any_other_case => {}
@@ -221,21 +224,20 @@ impl World {
             }
 
             Some(OrganismAction::ShareEnergy(amount, direction)) => {
-                match self.look_relative_mut((i, j), direction) {
-                    Some(WorldCell::DeadBody(ref mut n, _)) => *n += amount,
-                    Some(WorldCell::Organism(ref mut o)) => o.add_energy(amount),
-                    Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(amount, 0),
-                    None => {}
+                let max_energy = self.config.max_cell_size;
+                if let Some(WorldCell::Organism(ref mut o)) =
+                    self.look_relative_mut((i, j), direction)
+                {
+                    o.add_energy(amount, max_energy)
                 }
             }
 
             Some(OrganismAction::ShareMinerals(amount, direction)) => {
                 let max_minerals = self.config.max_minerals;
-                match self.look_relative_mut((i, j), direction) {
-                    Some(WorldCell::DeadBody(_, ref mut n)) => *n += amount,
-                    Some(WorldCell::Organism(ref mut o)) => o.add_minerals(amount, max_minerals),
-                    Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(0, amount),
-                    None => {}
+                if let Some(WorldCell::Organism(ref mut o)) =
+                    self.look_relative_mut((i, j), direction)
+                {
+                    o.add_minerals(amount, max_minerals)
                 }
             }
 
@@ -247,10 +249,6 @@ impl World {
             bot.can_clone,
         ) {
             bot.split_off(child_size, child_minerals, self.config.mutation_chance)
-        } else if bot.get_energy() > self.config.max_cell_size {
-            let (energy, minerals) =
-                (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals()).unwrap();
-            bot.split_off(energy, minerals, self.config.mutation_chance)
         } else {
             None
         };
@@ -334,4 +332,10 @@ impl Display for World {
         }
         Ok(())
     }
+}
+
+/// computate chance of eating based on masses of two cells
+#[inline(always)]
+fn mass_to_chance(own_mass: usize, target_mass: usize) -> bool {
+    thread_rng().gen_ratio(own_mass as u32, (own_mass + target_mass + 1) as u32)
 }

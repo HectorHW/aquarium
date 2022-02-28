@@ -172,7 +172,7 @@ impl Organism {
                 OpCode::Sythesize => {
                     self.next_instruction();
                     let generated = world.get_light(i);
-                    self.energy += generated;
+                    self.add_energy(generated, world.config.max_cell_size);
                     return None;
                 }
 
@@ -244,7 +244,7 @@ impl Organism {
                     self.next_instruction();
                     let mineral_energy =
                         (*self.result_register() as usize).min(self.stored_minerals);
-                    self.energy += mineral_energy;
+                    self.add_energy(mineral_energy, world.config.max_cell_size);
                     self.stored_minerals -= mineral_energy;
                     return None;
                 }
@@ -273,8 +273,8 @@ impl Organism {
         None
     }
 
-    pub fn add_energy(&mut self, energy: usize) {
-        self.energy += energy;
+    pub fn add_energy(&mut self, energy: usize, limit: usize) {
+        self.energy = (self.energy + energy).min(limit);
     }
 
     pub fn add_minerals(&mut self, minerals: usize, limit: usize) {
@@ -305,7 +305,7 @@ impl Organism {
         minerals: usize,
         mutation_chance: usize,
     ) -> Option<Box<Organism>> {
-        if self.energy > energy {
+        if self.energy > energy * 2 {
             let child_program = self.code.clone_lossy(mutation_chance);
             let child = Box::new(Self::with_program(energy, minerals, child_program));
             self.energy -= energy;
