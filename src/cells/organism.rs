@@ -210,10 +210,11 @@ impl Organism {
                     self.next_instruction();
                     let child_energy = usize::max(
                         world.config.start_energy,
-                        self.energy * inherit_rate as usize / 256usize,
+                        self.energy * inherit_rate as usize / 256usize / 2,
                     );
 
-                    let child_minerals = self.stored_minerals * inherit_rate as usize / 256usize;
+                    let child_minerals =
+                        self.stored_minerals * inherit_rate as usize / 256usize / 2;
 
                     return Some(OrganismAction::TryClone(
                         child_energy,
