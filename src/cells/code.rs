@@ -51,15 +51,15 @@ pub enum OpCode {
     SkipZero(PackedAddress),
 
     MoveRelative,
-    LookRelative(PackedAddress),
+    LookRelative,
 
     Eat,
     Clone(u8),
-    Compare(PackedAddress),
+    Compare,
 
-    UseMinerals(PackedAddress),
-    Share(PackedAddress),
-    ShareMinerals(PackedAddress),
+    UseMinerals,
+    Share,
+    ShareMinerals,
     Sythesize,
 }
 
@@ -77,14 +77,14 @@ impl Distribution<OpCode> for Standard {
             6 => JumpUnconditional(param),
             7 => SkipZero(param.into()),
             8 => MoveRelative,
-            9 => LookRelative(param.into()),
+            9 => LookRelative,
 
             10 => OpCode::Eat,
             11 => Clone(param),
-            12 => Compare(param.into()),
-            13 => UseMinerals(param.into()),
-            14 => Share(param.into()),
-            15 => ShareMinerals(param.into()),
+            12 => Compare,
+            13 => UseMinerals,
+            14 => Share,
+            15 => ShareMinerals,
 
             _ => OpCode::Sythesize,
         }
@@ -161,9 +161,8 @@ impl Display for Program {
                             OpCode::MoveRelative => {
                                 "move relative".to_string()
                             }
-                            OpCode::LookRelative(addr) => {
-                                let addr = addr.unwrap();
-                                format!("look relative by register {addr}")
+                            OpCode::LookRelative => {
+                                "look relative".to_string()
                             }
                             OpCode::Eat => "eat".to_string(),
                             OpCode::Clone(size) => {
@@ -171,14 +170,10 @@ impl Display for Program {
                                 format!("clone giving {:.2}% mass", portion * 100f64)
                             }
                             OpCode::Sythesize => "photosynthesize".to_string(),
-                            OpCode::Compare(t) =>
-                                format!("compare and put result in register {}", t.unwrap()),
-                            OpCode::UseMinerals(n) =>
-                                format!("use minerals by register {}", n.unwrap()),
-                            OpCode::Share(addr) =>
-                                format!("share nergy using register {} as value", addr.unwrap()),
-                            OpCode::ShareMinerals(addr) =>
-                                format!("share minerals using register {} as value", addr.unwrap()),
+                            OpCode::Compare => "compare".to_string(),
+                            OpCode::UseMinerals => "use minerals".to_string(),
+                            OpCode::Share => "share energy".to_string(),
+                            OpCode::ShareMinerals => "share minerals".to_string(),
                         }
                     )
                 })

@@ -82,7 +82,7 @@ impl Organism {
             /// 1 - directional register - will store current bot direction
             /// 2 - random value - regenerated on every tick
             /// 3..15 - unassigned
-            registers: random_registers(),
+            registers: [0; 16],
             can_clone: code.0.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
             code,
             energy,
@@ -103,7 +103,7 @@ impl Organism {
             /// 1 - directional register - will store current bot direction
             /// 2 - random value - regenerated on every tick
             /// 3..15 - unassigned
-            registers: random_registers(),
+            registers: [0; 16],
             can_clone: program
                 .0
                 .iter()
@@ -115,7 +115,17 @@ impl Organism {
         }
     }
 
-    #[inline]
+    #[inline(always)]
+    fn next_instruction(&mut self) {
+        self.ip = (self.ip + 1) % self.code.0.len();
+    }
+
+    #[inline(always)]
+    fn jump(&mut self, delta: usize) {
+        self.ip = (self.ip + delta) % self.code.0.len();
+    }
+
+    #[inline(always)]
     pub fn tick(&mut self, world: &World, (i, j): (usize, usize)) -> Option<OrganismAction> {
         self.registers[2] = thread_rng().gen();
         self.registers[3] = i.min(255usize) as u8;
@@ -128,145 +138,139 @@ impl Organism {
 
         self.energy -= 1;
 
-        let res = match self.code.0[self.ip] {
-            OpCode::LoadInt(n) => {
-                *self.result_register() = n;
-                self.ip += 1;
-                None
-            }
-            OpCode::CopyRegisters(params) => {
-                let (from, to) = params.unwrap();
-                self.registers[to] = self.registers[from];
-                self.ip += 1;
-                None
-            }
-            OpCode::MoveRelative => {
-                self.ip += 1;
-                Some(OrganismAction::TryMove(self.get_direction()))
-            }
-            OpCode::LookRelative(addr) => {
-                self.ip += 1;
-                let direction = self.get_direction();
-                let world_cell = world.look_relative((i, j), direction);
-                self.registers[addr.unwrap()] = match world_cell {
-                    Some(super::world::WorldCell::Empty) => 0,
-
-                    Some(super::world::WorldCell::Organism(_)) => 1,
-                    Some(super::world::WorldCell::DeadBody(..)) => 2,
-                    None => 255,
-                };
-                None
-            }
-            OpCode::Eat => {
-                self.ip += 1;
-                Some(OrganismAction::TryEat(self.get_direction()))
-            }
-            OpCode::Sythesize => {
-                self.ip += 1;
-                let generated = world.get_light(i);
-                self.energy += generated;
-                None
-            }
-
-            OpCode::Add(addr) => {
-                self.ip += 1;
-                let (from, to) = addr.unwrap();
-                self.registers[from] += self.registers[to];
-                None
-            }
-            OpCode::AddClip(addr) => {
-                self.ip += 1;
-                let (from, to) = addr.unwrap();
-                self.registers[from] = self.registers[from].saturating_add(self.registers[to]);
-                None
-            }
-            OpCode::SubClip(addr) => {
-                self.ip += 1;
-                let (from, to) = addr.unwrap();
-                self.registers[from] = self.registers[from].saturating_sub(self.registers[to]);
-                None
-            }
-            OpCode::Flip(addr) => {
-                self.ip += 1;
-                let addr = addr.unwrap();
-                self.registers[addr] = if self.registers[addr] != 0 { 1 } else { 0 };
-                None
-            }
-            OpCode::JumpUnconditional(shift) => {
-                self.ip += shift as usize;
-                None
-            }
-            OpCode::SkipZero(addr) => {
-                if self.registers[addr.unwrap()] == 0 {
-                    self.ip += 2;
-                } else {
-                    self.ip += 1;
+        for _ in 0..16 {
+            match self.code.0[self.ip] {
+                OpCode::LoadInt(n) => {
+                    self.next_instruction();
+                    *self.result_register() = n;
                 }
-                None
-            }
-            OpCode::Clone(inherit_rate) => {
-                let child_energy = usize::max(
-                    world.config.start_energy,
-                    self.energy * inherit_rate as usize / 256usize,
-                );
+                OpCode::CopyRegisters(params) => {
+                    self.next_instruction();
+                    let (from, to) = params.unwrap();
+                    self.registers[to] = self.registers[from];
+                }
+                OpCode::MoveRelative => {
+                    self.next_instruction();
+                    return Some(OrganismAction::TryMove(self.get_direction()));
+                }
+                OpCode::LookRelative => {
+                    self.next_instruction();
+                    let direction = self.get_direction();
+                    let world_cell = world.look_relative((i, j), direction);
+                    *self.result_register() = match world_cell {
+                        Some(super::world::WorldCell::Empty) => 0,
 
-                let child_minerals = self.stored_minerals * inherit_rate as usize / 256usize;
+                        Some(super::world::WorldCell::Organism(_)) => 1,
+                        Some(super::world::WorldCell::DeadBody(..)) => 2,
+                        None => 255,
+                    };
+                }
+                OpCode::Eat => {
+                    self.next_instruction();
+                    return Some(OrganismAction::TryEat(self.get_direction()));
+                }
+                OpCode::Sythesize => {
+                    self.next_instruction();
+                    let generated = world.get_light(i);
+                    self.energy += generated;
+                    return None;
+                }
 
-                Some(OrganismAction::TryClone(
-                    child_energy,
-                    child_minerals,
-                    self.get_direction(),
-                ))
-            }
-            OpCode::Compare(addr) => {
-                self.ip += 1;
-                let direction = self.get_direction();
-                let world_cell = world.look_relative((i, j), direction);
-                self.registers[addr.unwrap()] = match world_cell {
-                    Some(super::world::WorldCell::Organism(other)) => {
-                        self.code
-                            .0
-                            .iter()
-                            .zip(other.code.0.iter())
-                            .filter(|(a, b)| a != b)
-                            .count()
-                            .max(255) as u8
+                OpCode::Add(addr) => {
+                    self.next_instruction();
+                    let (from, to) = addr.unwrap();
+                    self.registers[from] += self.registers[to];
+                }
+                OpCode::AddClip(addr) => {
+                    self.next_instruction();
+                    let (from, to) = addr.unwrap();
+                    self.registers[from] = self.registers[from].saturating_add(self.registers[to]);
+                }
+                OpCode::SubClip(addr) => {
+                    self.next_instruction();
+                    let (from, to) = addr.unwrap();
+                    self.registers[from] = self.registers[from].saturating_sub(self.registers[to]);
+                }
+                OpCode::Flip(addr) => {
+                    self.next_instruction();
+                    let addr = addr.unwrap();
+                    self.registers[addr] = if self.registers[addr] != 0 { 1 } else { 0 };
+                }
+                OpCode::JumpUnconditional(shift) => {
+                    self.jump(shift as usize);
+                }
+                OpCode::SkipZero(addr) => {
+                    if self.registers[addr.unwrap()] == 0 {
+                        self.jump(2);
+                    } else {
+                        self.next_instruction();
                     }
-                    Some(super::world::WorldCell::DeadBody(..)) => 255,
-                    _ => 0,
-                };
-                None
-            }
+                }
+                OpCode::Clone(inherit_rate) => {
+                    self.next_instruction();
+                    let child_energy = usize::max(
+                        world.config.start_energy,
+                        self.energy * inherit_rate as usize / 256usize,
+                    );
 
-            OpCode::UseMinerals(n) => {
-                let mineral_energy =
-                    (self.registers[n.unwrap()] as usize).min(self.stored_minerals);
-                self.energy += mineral_energy * 4;
-                self.stored_minerals -= mineral_energy;
-                None
-            }
-            OpCode::Share(addr) => {
-                let share_value = usize::min(self.registers[addr.unwrap()] as usize, self.energy);
-                self.energy -= share_value;
-                Some(OrganismAction::ShareEnergy(
-                    share_value,
-                    self.get_direction(),
-                ))
-            }
+                    let child_minerals = self.stored_minerals * inherit_rate as usize / 256usize;
 
-            OpCode::ShareMinerals(addr) => {
-                let share_value =
-                    usize::min(self.registers[addr.unwrap()] as usize, self.stored_minerals);
-                self.stored_minerals -= share_value;
-                Some(OrganismAction::ShareMinerals(
-                    share_value,
-                    self.get_direction(),
-                ))
-            }
-        };
+                    return Some(OrganismAction::TryClone(
+                        child_energy,
+                        child_minerals,
+                        self.get_direction(),
+                    ));
+                }
+                OpCode::Compare => {
+                    self.next_instruction();
+                    let direction = self.get_direction();
+                    let world_cell = world.look_relative((i, j), direction);
+                    *self.result_register() = match world_cell {
+                        Some(super::world::WorldCell::Organism(other)) => {
+                            self.code
+                                .0
+                                .iter()
+                                .zip(other.code.0.iter())
+                                .filter(|(a, b)| a != b)
+                                .count()
+                                .max(255) as u8
+                        }
+                        Some(super::world::WorldCell::DeadBody(..)) => 255,
+                        _ => 0,
+                    };
+                }
 
-        self.ip %= self.code.0.len();
-        res
+                OpCode::UseMinerals => {
+                    self.next_instruction();
+                    let mineral_energy =
+                        (*self.result_register() as usize).min(self.stored_minerals);
+                    self.energy += mineral_energy;
+                    self.stored_minerals -= mineral_energy;
+                    return None;
+                }
+                OpCode::Share => {
+                    self.next_instruction();
+                    let share_value = usize::min(*self.result_register() as usize, self.energy);
+                    self.energy -= share_value;
+                    return Some(OrganismAction::ShareEnergy(
+                        share_value,
+                        self.get_direction(),
+                    ));
+                }
+
+                OpCode::ShareMinerals => {
+                    self.next_instruction();
+                    let share_value =
+                        usize::min(*self.result_register() as usize, self.stored_minerals);
+                    self.stored_minerals -= share_value;
+                    return Some(OrganismAction::ShareMinerals(
+                        share_value,
+                        self.get_direction(),
+                    ));
+                }
+            };
+        }
+        None
     }
 
     pub fn add_energy(&mut self, energy: usize) {
@@ -277,10 +281,12 @@ impl Organism {
         self.stored_minerals = (self.stored_minerals + minerals).min(limit);
     }
 
+    #[inline(always)]
     fn get_direction(&self) -> Direction {
         self.registers[1].into()
     }
 
+    #[inline(always)]
     fn result_register(&mut self) -> &mut u8 {
         &mut self.registers[0]
     }

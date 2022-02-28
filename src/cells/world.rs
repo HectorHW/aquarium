@@ -157,14 +157,14 @@ impl World {
         (self.config.minerals_behaviour)(i)
     }
 
-    #[inline]
+    #[inline(always)]
     fn run_bot_prelude(&mut self, (i, _j): (usize, usize), bot: &mut Organism) {
         let minerals = self.get_minerals(i);
         bot.add_minerals(minerals, self.config.max_minerals)
     }
 
     #[inline]
-    fn process_bot(&mut self, (i, j): (usize, usize), mut bot: Box<Organism>) {
+    fn process_bot(&mut self, (mut i, mut j): (usize, usize), mut bot: Box<Organism>) {
         self.run_bot_prelude((i, j), bot.as_mut());
 
         match bot.tick(self, (i, j)) {
@@ -192,21 +192,19 @@ impl World {
 
                     _any_other_case => {}
                 }
-
-                self.field[i][j] = WorldCell::Organism(bot);
             }
             Some(OrganismAction::TryMove(direction)) => {
                 if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
                     let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
-                    self.field[new_i][new_j] = WorldCell::Organism(bot);
+                    i = new_i;
+                    j = new_i;
                     self.updates[new_i][new_j] = self.updates[new_i][new_j].wrapping_add(1);
-                } else {
-                    self.field[i][j] = WorldCell::Organism(bot);
                 }
             }
 
             Some(OrganismAction::Die) => {
                 self.field[i][j] = WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
+                return;
             }
 
             Some(OrganismAction::TryClone(child_size, child_minerals, direction)) => {
@@ -217,10 +215,7 @@ impl World {
                         let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
                         self.field[new_i][new_j] = WorldCell::Organism(child);
                         self.field[i][j] = WorldCell::Organism(bot);
-                    } else {
-                        //bot dies if it cannot create a child when needed
-                        self.field[i][j] =
-                            WorldCell::DeadBody(bot.get_energy(), bot.get_minerals());
+                        return;
                     }
                 }
             }
@@ -232,7 +227,6 @@ impl World {
                     Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(amount, 0),
                     None => {}
                 }
-                self.field[i][j] = WorldCell::Organism(bot);
             }
 
             Some(OrganismAction::ShareMinerals(amount, direction)) => {
@@ -243,42 +237,32 @@ impl World {
                     Some(c @ WorldCell::Empty) => *c = WorldCell::DeadBody(0, amount),
                     None => {}
                 }
-                self.field[i][j] = WorldCell::Organism(bot);
             }
 
-            None => {
-                let child = if let (Ok((child_size, child_minerals)), false) = (
-                    (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals()),
-                    bot.can_clone,
-                ) {
-                    bot.split_off(child_size, child_minerals, self.config.mutation_chance)
-                } else if bot.get_energy() > self.config.max_cell_size {
-                    let (energy, minerals) =
-                        (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals())
-                            .unwrap();
-                    bot.split_off(energy, minerals, self.config.mutation_chance)
-                } else {
-                    None
-                };
-
-                if let Some(child) = child {
-                    match self.try_place_bot((i, j), child) {
-                        Ok(()) => {
-                            self.field[i][j] = WorldCell::Organism(bot);
-                        }
-
-                        Err(()) => {
-                            self.field[i][j] =
-                                WorldCell::DeadBody(bot.get_energy(), bot.get_minerals());
-                        }
-                    }
-                } else {
-                    self.field[i][j] = WorldCell::Organism(bot);
-                }
-            }
+            None => {}
         }
+
+        let child = if let (Ok((child_size, child_minerals)), false) = (
+            (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals()),
+            bot.can_clone,
+        ) {
+            bot.split_off(child_size, child_minerals, self.config.mutation_chance)
+        } else if bot.get_energy() > self.config.max_cell_size {
+            let (energy, minerals) =
+                (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals()).unwrap();
+            bot.split_off(energy, minerals, self.config.mutation_chance)
+        } else {
+            None
+        };
+
+        if let Some(child) = child {
+            let _ = self.try_place_bot((i, j), child);
+        }
+
+        self.field[i][j] = WorldCell::Organism(bot);
     }
 
+    #[inline]
     fn try_place_bot(&mut self, (i, j): (usize, usize), bot: Box<Organism>) -> Result<(), ()> {
         let mut directions = [
             Direction::Up,

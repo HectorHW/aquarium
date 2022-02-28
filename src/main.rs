@@ -26,25 +26,25 @@ async fn main() {
         start_energy: 40,
         dead_energy: 20,
         split_behaviour: |energy, minerals| {
-            if energy > 80 {
+            if energy > 200 {
                 Ok((energy / 2, minerals / 2))
             } else {
                 Err(())
             }
         },
-        light_behaviour: |i| 7usize.saturating_sub(i / 4),
+        light_behaviour: |i| 4usize.saturating_sub(i / 9),
         mutation_chance: 5,
         max_cell_size: 400,
         minerals_behaviour: |i| {
             let distance_from_bottom = 50 - i - 1;
-            7.saturating_sub(distance_from_bottom / 4)
+            4.saturating_sub(distance_from_bottom / 9)
         },
         max_minerals: 100,
     };
 
     let state = Arc::new(parking_lot::Mutex::new({
         let mut world = World::empty::<100, 50>(config);
-        world.populate_green(500).unwrap();
+        world.populate_random(500).unwrap();
         ServerState {
             paused: false,
             target_tps: 0,
