@@ -211,10 +211,10 @@ impl World {
             }
 
             Some(OrganismAction::TryClone(child_size, child_minerals, direction)) => {
-                if let Some(child) =
-                    bot.split_off(child_size, child_minerals, self.config.mutation_chance)
-                {
-                    if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
+                if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
+                    if let Some(child) =
+                        bot.split_off(child_size, child_minerals, self.config.mutation_chance)
+                    {
                         let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
                         self.field[new_i][new_j] = WorldCell::Organism(child);
                         self.field[i][j] = WorldCell::Organism(bot);

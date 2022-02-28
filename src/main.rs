@@ -33,7 +33,7 @@ async fn main() {
             }
         },
         light_behaviour: |i| 3usize.saturating_sub(i / 10),
-        mutation_chance: 5,
+        mutation_chance: 1,
         max_cell_size: 500,
         minerals_behaviour: |i| {
             let distance_from_bottom = 50 - i - 1;
