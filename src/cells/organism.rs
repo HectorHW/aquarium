@@ -88,15 +88,18 @@ fn random_registers() -> [u8; 16] {
     res
 }
 
+///registers
+/// 0 - result register - observing instructions will put result here
+/// 1 - directional register - will store current bot direction
+/// 2 - random value - regenerated on every tick
+/// 3 - depth register
+/// 4 - minerals
+/// 5 - energy
+/// 6 - attack
 impl Organism {
     pub fn random(energy: usize) -> Self {
         let code = Program::random_program();
         Organism {
-            ///registers
-            /// 0 - result register - observing instructions will put result here
-            /// 1 - directional register - will store current bot direction
-            /// 2 - random value - regenerated on every tick
-            /// 3..15 - unassigned
             registers: [0; 16],
             can_clone: code.0.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
             code,
@@ -113,11 +116,6 @@ impl Organism {
 
     fn with_program(energy: usize, minerals: usize, program: Program) -> Self {
         Organism {
-            ///registers
-            /// 0 - result register - observing instructions will put result here
-            /// 1 - directional register - will store current bot direction
-            /// 2 - random value - regenerated on every tick
-            /// 3..15 - unassigned
             registers: [0; 16],
             can_clone: program
                 .0
@@ -316,7 +314,7 @@ impl Organism {
     }
 
     pub fn register_attack(&mut self, direction: Direction) {
-        self.registers[1] = direction.into();
+        self.registers[6] = direction.into();
     }
 
     pub fn split_off(
