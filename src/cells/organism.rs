@@ -90,12 +90,13 @@ fn random_registers() -> [u8; 16] {
 
 ///registers
 /// 0 - result register - observing instructions will put result here
-/// 1 - directional register - will store current bot direction
-/// 2 - random value - regenerated on every tick
-/// 3 - depth register
-/// 4 - minerals
-/// 5 - energy
-/// 6 - attack
+/// 1 - result2 register
+/// 2 - directional register - will store current bot direction
+/// 3 - random value - regenerated on every tick
+/// 4 - depth register
+/// 5 - minerals
+/// 6 - energy
+/// 7 - attack
 impl Organism {
     pub fn random(energy: usize) -> Self {
         let code = Program::random_program();
@@ -140,10 +141,10 @@ impl Organism {
 
     #[inline(always)]
     pub fn tick(&mut self, world: &World, (i, j): (usize, usize)) -> Option<OrganismAction> {
-        self.registers[2] = thread_rng().gen();
-        self.registers[3] = into_u8_fraction(i, world.get_height());
-        self.registers[4] = into_u8_fraction(self.get_minerals(), world.config.max_minerals);
-        self.registers[5] = into_u8_fraction(self.get_energy(), world.config.max_cell_size);
+        self.registers[3] = thread_rng().gen();
+        self.registers[4] = into_u8_fraction(i, world.get_height());
+        self.registers[5] = into_u8_fraction(self.get_minerals(), world.config.max_minerals);
+        self.registers[6] = into_u8_fraction(self.get_energy(), world.config.max_cell_size);
 
         if self.energy == 0 {
             return Some(OrganismAction::Die);
@@ -173,7 +174,11 @@ impl Organism {
                     *self.result_register() = match world_cell {
                         Some(super::world::WorldCell::Empty) => 0,
 
-                        Some(super::world::WorldCell::Organism(_)) => 1,
+                        Some(super::world::WorldCell::Organism(o)) => {
+                            *self.result2_register() =
+                                into_u8_fraction(o.get_energy(), world.config.max_cell_size);
+                            1
+                        }
                         Some(super::world::WorldCell::DeadBody(..)) => 2,
                         None => 255,
                     };
@@ -241,6 +246,9 @@ impl Organism {
                     let world_cell = world.look_relative((i, j), direction);
                     *self.result_register() = match world_cell {
                         Some(super::world::WorldCell::Organism(other)) => {
+                            *self.result2_register() =
+                                into_u8_fraction(other.get_energy(), world.config.max_cell_size);
+
                             self.code
                                 .0
                                 .iter()
@@ -301,12 +309,17 @@ impl Organism {
 
     #[inline(always)]
     fn get_direction(&self) -> Direction {
-        self.registers[1].into()
+        self.registers[2].into()
     }
 
     #[inline(always)]
     fn result_register(&mut self) -> &mut u8 {
         &mut self.registers[0]
+    }
+
+    #[inline(always)]
+    fn result2_register(&mut self) -> &mut u8 {
+        &mut self.registers[1]
     }
 
     pub fn get_energy(&self) -> usize {
@@ -318,7 +331,7 @@ impl Organism {
     }
 
     pub fn register_attack(&mut self, direction: Direction) {
-        self.registers[6] = direction.into();
+        self.registers[7] = direction.into();
     }
 
     pub fn split_off(
