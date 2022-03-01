@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use rand::{thread_rng, Rng};
+use rand::{distributions::Bernoulli, thread_rng, Rng};
 
 use crate::cells::code::OpCode;
 
@@ -349,6 +349,10 @@ impl Organism {
         } else {
             None
         }
+    }
+
+    pub fn age(&mut self, aging_mutation_chance: &Bernoulli) {
+        self.code.break_with_chance(aging_mutation_chance);
     }
 }
 

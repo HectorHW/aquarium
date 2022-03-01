@@ -1,7 +1,7 @@
 use std::{fmt::Display, mem};
 
 use num_bigint::BigUint;
-use rand::{prelude::SliceRandom, thread_rng, Rng};
+use rand::{distributions::Bernoulli, prelude::SliceRandom, thread_rng, Rng};
 
 use super::organism::{Direction, Organism, OrganismAction};
 
@@ -13,6 +13,7 @@ pub struct WorldConfig {
     pub light_behaviour: fn(usize) -> usize,
     pub minerals_behaviour: fn(usize) -> usize,
     pub mutation_chance: usize,
+    pub aging_mutation_freq: Bernoulli,
     pub max_cell_size: usize,
     pub max_minerals: usize,
     pub attack_cost: usize,
@@ -161,7 +162,8 @@ impl World {
     #[inline(always)]
     fn run_bot_prelude(&mut self, (i, _j): (usize, usize), bot: &mut Organism) {
         let minerals = self.get_minerals(i);
-        bot.add_minerals(minerals, self.config.max_minerals)
+        bot.add_minerals(minerals, self.config.max_minerals);
+        bot.age(&self.config.aging_mutation_freq);
     }
 
     #[inline(always)]

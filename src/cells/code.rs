@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use rand::distributions::Standard;
+use rand::distributions::{Bernoulli, Standard};
 use rand::prelude::Distribution;
 use rand::{thread_rng, Rng};
 
@@ -111,6 +111,13 @@ impl Program {
             }
         }
         Program(items.into_array().unwrap())
+    }
+
+    pub fn break_with_chance(&mut self, damage_chance: &Bernoulli) {
+        if damage_chance.sample(&mut thread_rng()) {
+            let instruction = &mut self.0[thread_rng().gen::<usize>() % self.0.len()];
+            *instruction = thread_rng().gen();
+        }
     }
 }
 

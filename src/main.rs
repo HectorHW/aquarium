@@ -3,6 +3,7 @@ extern crate rand;
 use std::sync::Arc;
 
 use num::Saturating;
+use rand::distributions::Bernoulli;
 use std::thread;
 use std::time::Duration;
 use tokio::task;
@@ -34,6 +35,7 @@ async fn main() {
         },
         light_behaviour: |i| 3usize.saturating_sub(i / 10),
         mutation_chance: 1,
+        aging_mutation_freq: Bernoulli::from_ratio(1, 1000).unwrap(),
         max_cell_size: 500,
         minerals_behaviour: |i| {
             let distance_from_bottom = 50 - i - 1;
