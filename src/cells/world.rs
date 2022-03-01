@@ -174,14 +174,16 @@ impl World {
                     Some(&mut WorldCell::Organism(ref mut other)) => {
                         let energy = other.get_energy();
 
-                        if mass_to_chance(bot.get_energy(), energy) {
+                        let chance = mass_to_chance(bot.get_energy(), energy);
+                        bot.decrease_energy(10);
+                        if chance {
                             bot.add_energy(
                                 energy.saturating_sub(dead_energy) / 2,
                                 self.config.max_cell_size,
                             );
                             *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
                         } else {
-                            other.register_attack(direction.inverse())
+                            other.register_attack(direction.inverse());
                         }
                     }
 

@@ -291,6 +291,10 @@ impl Organism {
         self.energy = (self.energy + energy).min(limit);
     }
 
+    pub fn decrease_energy(&mut self, energy: usize) {
+        self.energy = self.energy.saturating_sub(energy);
+    }
+
     pub fn add_minerals(&mut self, minerals: usize, limit: usize) {
         self.stored_minerals = (self.stored_minerals + minerals).min(limit);
     }
