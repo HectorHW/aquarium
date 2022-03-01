@@ -48,8 +48,13 @@ pub fn build_routes(
     });
 
     let set_setting = warp::path!("set-config").and(warp::body::json()).map({
-        let state = state;
+        let state = state.clone();
         move |(k, v)| api::set_setting(&state, k, v)
+    });
+
+    let reset_world = warp::path!("reset").map({
+        let state = state.clone();
+        move || api::reset(&state)
     });
 
     let cors = warp::cors()
@@ -65,7 +70,8 @@ pub fn build_routes(
                 .or(spawn_random)
                 .or(spawn_green)
                 .or(tick)
-                .or(set_setting),
+                .or(set_setting)
+                .or(reset_world),
         ))
         .with(cors);
 

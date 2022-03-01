@@ -128,3 +128,13 @@ pub fn set_setting(state: &AMState, key: String, value: usize) -> impl warp::Rep
     }
     warp::reply::with_status("ok".to_string(), StatusCode::OK)
 }
+
+pub fn reset(state: &AMState) -> impl warp::Reply {
+    let mut state = state.lock();
+    let world = &mut state.world;
+    world
+        .field
+        .iter_mut()
+        .for_each(|row| row.iter_mut().for_each(|cell| *cell = WorldCell::Empty));
+    warp::reply()
+}
