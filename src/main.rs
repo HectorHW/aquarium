@@ -40,6 +40,7 @@ async fn main() {
             3.saturating_sub(distance_from_bottom / 10)
         },
         max_minerals: 100,
+        attack_cost: 10,
     };
 
     let state = Arc::new(parking_lot::Mutex::new({

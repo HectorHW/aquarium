@@ -15,6 +15,7 @@ pub struct WorldConfig {
     pub mutation_chance: usize,
     pub max_cell_size: usize,
     pub max_minerals: usize,
+    pub attack_cost: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -170,12 +171,15 @@ impl World {
         match bot.tick(self, (i, j)) {
             Some(OrganismAction::TryEat(direction)) => {
                 let dead_energy = self.config.dead_energy;
+                let attack_cost = self.config.attack_cost;
                 match self.look_relative_mut((i, j), direction) {
-                    Some(&mut WorldCell::Organism(ref mut other)) => {
+                    Some(&mut WorldCell::Organism(ref mut other))
+                        if bot.get_energy() > attack_cost =>
+                    {
                         let energy = other.get_energy();
 
                         let chance = mass_to_chance(bot.get_energy(), energy);
-                        bot.decrease_energy(10);
+                        bot.decrease_energy(attack_cost);
                         if chance {
                             bot.add_energy(
                                 energy.saturating_sub(dead_energy) / 2,
