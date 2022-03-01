@@ -180,6 +180,8 @@ impl World {
                                 self.config.max_cell_size,
                             );
                             *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
+                        } else {
+                            other.register_attack(direction.inverse())
                         }
                     }
 

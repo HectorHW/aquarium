@@ -33,15 +33,30 @@ impl Direction {
             Direction::Right => (0, 1),
         }
     }
+
+    pub fn inverse(&self) -> Direction {
+        self.next_clockwise().next_clockwise()
+    }
 }
 
 impl From<u8> for Direction {
     fn from(n: u8) -> Self {
         match n % 4 {
             0 => Direction::Up,
-            1 => Direction::Down,
-            2 => Direction::Left,
-            _ => Direction::Right,
+            1 => Direction::Right,
+            2 => Direction::Down,
+            _ => Direction::Left,
+        }
+    }
+}
+
+impl From<Direction> for u8 {
+    fn from(d: Direction) -> Self {
+        match d {
+            Direction::Up => 0,
+            Direction::Right => 1,
+            Direction::Down => 2,
+            Direction::Left => 3,
         }
     }
 }
@@ -298,6 +313,10 @@ impl Organism {
 
     pub fn get_minerals(&self) -> usize {
         self.stored_minerals
+    }
+
+    pub fn register_attack(&mut self, direction: Direction) {
+        self.registers[1] = direction.into();
     }
 
     pub fn split_off(
