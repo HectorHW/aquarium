@@ -141,9 +141,9 @@ impl Organism {
     #[inline(always)]
     pub fn tick(&mut self, world: &World, (i, j): (usize, usize)) -> Option<OrganismAction> {
         self.registers[2] = thread_rng().gen();
-        self.registers[3] = i.min(255usize) as u8;
-        self.registers[4] = self.get_minerals().min(255usize) as u8;
-        self.registers[5] = self.get_energy().min(255usize) as u8;
+        self.registers[3] = into_u8_fraction(i, world.get_height());
+        self.registers[4] = into_u8_fraction(self.get_minerals(), world.config.max_minerals);
+        self.registers[5] = into_u8_fraction(self.get_energy(), world.config.max_cell_size);
 
         if self.energy == 0 {
             return Some(OrganismAction::Die);
@@ -356,4 +356,8 @@ impl Display for Organism {
             self.code
         )
     }
+}
+
+fn into_u8_fraction(value: usize, divisor: usize) -> u8 {
+    ((value as f64 / divisor as f64) * 255f64).clamp(0f64, 255f64) as u8
 }
