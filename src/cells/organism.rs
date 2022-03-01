@@ -358,6 +358,7 @@ impl Display for Organism {
     }
 }
 
+#[inline(always)]
 fn into_u8_fraction(value: usize, divisor: usize) -> u8 {
-    ((value as f64 / divisor as f64) * 255f64).clamp(0f64, 255f64) as u8
+    ((value * 255usize) / divisor).clamp(0, 255) as u8
 }
