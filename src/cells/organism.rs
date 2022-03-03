@@ -340,7 +340,7 @@ impl Organism {
         minerals: usize,
         mutation_chance: usize,
     ) -> Option<Box<Organism>> {
-        if self.energy > energy * 2 {
+        if self.energy >= energy * 2 {
             let child_program = self.code.clone_lossy(mutation_chance);
             let child = Box::new(Self::with_program(energy, minerals, child_program));
             self.energy -= energy;
