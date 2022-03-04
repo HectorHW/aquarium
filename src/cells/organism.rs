@@ -1,12 +1,13 @@
 use std::fmt::Display;
 
 use rand::{distributions::Bernoulli, thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 
 use crate::cells::code::OpCode;
 
 use super::{code::Program, world::World};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Direction {
     Up,
     Down,
@@ -71,7 +72,7 @@ pub enum OrganismAction {
     ShareMinerals(usize, Direction),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Organism {
     registers: [u8; 16],
     code: Program,
@@ -102,7 +103,10 @@ impl Organism {
         let code = Program::random_program();
         Organism {
             registers: [0; 16],
-            can_clone: code.0.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
+            can_clone: code
+                .code
+                .iter()
+                .any(|gene| matches!(gene, OpCode::Clone(..))),
             code,
             energy,
             stored_minerals: 0,
@@ -111,17 +115,16 @@ impl Organism {
     }
 
     pub fn green(energy: usize) -> Self {
-        let program = Program([OpCode::Sythesize; 256]);
+        let program = Program {
+            code: [OpCode::Sythesize; 256],
+        };
         Self::with_program(energy, 0, program)
     }
 
     fn with_program(energy: usize, minerals: usize, program: Program) -> Self {
         Organism {
             registers: [0; 16],
-            can_clone: program
-                .0
-                .iter()
-                .any(|gene| matches!(gene, OpCode::Clone(..))),
+            can_clone: program.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
             code: program,
             energy,
             stored_minerals: minerals,
@@ -131,12 +134,12 @@ impl Organism {
 
     #[inline(always)]
     fn next_instruction(&mut self) {
-        self.ip = (self.ip + 1) % self.code.0.len();
+        self.ip = (self.ip + 1) % self.code.len();
     }
 
     #[inline(always)]
     fn jump(&mut self, delta: usize) {
-        self.ip = (self.ip + delta) % self.code.0.len();
+        self.ip = (self.ip + delta) % self.code.len();
     }
 
     #[inline(always)]
@@ -153,7 +156,7 @@ impl Organism {
         self.energy -= 1;
 
         for _ in 0..16 {
-            match self.code.0[self.ip] {
+            match self.code[self.ip] {
                 OpCode::LoadInt(n) => {
                     self.next_instruction();
                     *self.result_register() = n;
@@ -250,9 +253,8 @@ impl Organism {
                                 into_u8_fraction(other.get_energy(), world.config.max_cell_size);
 
                             self.code
-                                .0
                                 .iter()
-                                .zip(other.code.0.iter())
+                                .zip(other.code.iter())
                                 .filter(|(a, b)| a != b)
                                 .count()
                                 .max(255) as u8

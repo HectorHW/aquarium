@@ -57,13 +57,23 @@ pub fn build_routes(
         move || api::reset(&state)
     });
 
+    let save_world = warp::path!("save-world").map({
+        let state = state.clone();
+        move || api::save_world(&state)
+    });
+
+    let load_world = warp::path!("load-world").and(warp::body::json()).map({
+        let state = state.clone();
+        move |data| api::load_world(&state, data)
+    });
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_headers(vec!["*"])
         .allow_methods(vec!["*"]);
 
     let mappings = warp::get()
-        .and(serve_world_json.or(inspect).or(stats))
+        .and(serve_world_json.or(inspect).or(stats).or(save_world))
         .or(warp::post().and(
             pause_world
                 .or(set_tps)
@@ -71,7 +81,8 @@ pub fn build_routes(
                 .or(spawn_green)
                 .or(tick)
                 .or(set_setting)
-                .or(reset_world),
+                .or(reset_world)
+                .or(load_world),
         ))
         .with(cors);
 

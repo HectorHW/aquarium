@@ -1,15 +1,25 @@
 use std::fmt::Display;
+use std::ops::Deref;
 
 use rand::distributions::{Bernoulli, Standard};
 use rand::prelude::Distribution;
 use rand::{thread_rng, Rng};
 
+use serde::{Deserialize, Serialize};
+
 pub const CODE_SIZE: usize = 256;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Program(pub [OpCode; CODE_SIZE]);
+use serde_big_array::big_array;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+big_array! { BigOpcodeArray;}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Program {
+    #[serde(with = "BigOpcodeArray")]
+    pub code: [OpCode; CODE_SIZE],
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackedAdressPair(u8);
 
 impl PackedAdressPair {
@@ -24,7 +34,7 @@ impl From<u8> for PackedAdressPair {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackedAddress(u8);
 
 impl PackedAddress {
@@ -39,7 +49,7 @@ impl From<u8> for PackedAddress {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpCode {
     LoadInt(u8),
     CopyRegisters(PackedAdressPair),
@@ -61,6 +71,12 @@ pub enum OpCode {
     Share,
     ShareMinerals,
     Sythesize,
+}
+
+impl Default for OpCode {
+    fn default() -> Self {
+        OpCode::Sythesize
+    }
 }
 
 impl Distribution<OpCode> for Standard {
@@ -97,7 +113,9 @@ impl Program {
         for _ in 0..CODE_SIZE {
             items.push(rand::random()).unwrap();
         }
-        Program(items.into_array().unwrap())
+        Program {
+            code: items.into_array().unwrap(),
+        }
     }
 
     ///probability is counted as mutation_chance/1000
@@ -107,15 +125,17 @@ impl Program {
             if thread_rng().gen::<usize>() % 1000usize < mutation_chance {
                 items.push(rand::random()).unwrap();
             } else {
-                items.push(self.0[idx]).unwrap();
+                items.push(self.code[idx]).unwrap();
             }
         }
-        Program(items.into_array().unwrap())
+        Program {
+            code: items.into_array().unwrap(),
+        }
     }
 
     pub fn break_with_chance(&mut self, damage_chance: &Bernoulli) {
         if damage_chance.sample(&mut thread_rng()) {
-            let instruction = &mut self.0[thread_rng().gen::<usize>() % self.0.len()];
+            let instruction = &mut self.code[thread_rng().gen::<usize>() % self.code.len()];
             *instruction = thread_rng().gen();
         }
     }
@@ -126,7 +146,7 @@ impl Display for Program {
         write!(
             f,
             "{}",
-            self.0
+            self.code
                 .iter()
                 .enumerate()
                 .map(|(idx, instr)| {
@@ -158,7 +178,7 @@ impl Display for Program {
                             OpCode::JumpUnconditional(shift) => {
                                 format!(
                                     "jump {shift} (to {})",
-                                    (idx + *shift as usize) % self.0.len()
+                                    (idx + *shift as usize) % self.code.len()
                                 )
                             }
                             OpCode::SkipZero(addr) => {
@@ -187,5 +207,28 @@ impl Display for Program {
                 .collect::<Vec<String>>()
                 .join("\n")
         )
+    }
+}
+
+impl Deref for Program {
+    type Target = [OpCode; CODE_SIZE];
+
+    fn deref(&self) -> &Self::Target {
+        &self.code
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Program;
+
+    #[test]
+    fn test_program_serialization() {
+        let program = Program::random_program();
+
+        let json = serde_json::to_string(&program).unwrap();
+
+        let recovered: Program = serde_json::from_str(json.as_str()).unwrap();
+        assert_eq!(program, recovered);
     }
 }

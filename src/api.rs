@@ -3,7 +3,11 @@ use warp::{
     reply::Json,
 };
 
-use crate::{cells::world::WorldCell, serialization::store_world_shallow, state::AMState};
+use crate::{
+    cells::world::{WorldCell, WorldField},
+    serialization::store_world_shallow,
+    state::AMState,
+};
 
 pub fn get_map(state: &AMState) -> Json {
     let state = state.lock();
@@ -136,5 +140,18 @@ pub fn reset(state: &AMState) -> impl warp::Reply {
         .field
         .iter_mut()
         .for_each(|row| row.iter_mut().for_each(|cell| *cell = WorldCell::Empty));
+    warp::reply()
+}
+
+pub fn save_world(state: &AMState) -> Json {
+    let state = state.lock();
+    let world = &state.world;
+
+    warp::reply::json(&world.field)
+}
+
+pub fn load_world(state: &AMState, data: WorldField) -> impl warp::Reply {
+    let mut state = state.lock();
+    state.world.field = data;
     warp::reply()
 }

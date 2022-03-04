@@ -1,7 +1,12 @@
-use std::{fmt::Display, mem};
+use std::{
+    fmt::Display,
+    mem,
+    ops::{Deref, DerefMut},
+};
 
 use num_bigint::BigUint;
 use rand::{distributions::Bernoulli, prelude::SliceRandom, thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 
 use super::organism::{Direction, Organism, OrganismAction};
 
@@ -19,15 +24,32 @@ pub struct WorldConfig {
     pub attack_cost: usize,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum WorldCell {
     Empty,
     Organism(Box<Organism>),
     DeadBody(usize, usize),
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WorldField(Vec<Vec<WorldCell>>);
+
+impl Deref for WorldField {
+    type Target = Vec<Vec<WorldCell>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for WorldField {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 pub struct World {
-    pub field: Vec<Vec<WorldCell>>,
+    pub field: WorldField,
     iteration: usize,
     updates: Vec<Vec<usize>>,
 
@@ -39,7 +61,7 @@ impl World {
     pub fn empty<const WIDTH: usize, const HEIGHT: usize>(config: WorldConfig) -> Self {
         let field = vec![vec![WorldCell::Empty; WIDTH]; HEIGHT];
         World {
-            field,
+            field: WorldField(field),
             iteration: 1,
             updates: vec![vec![0; WIDTH]; HEIGHT],
             config,
