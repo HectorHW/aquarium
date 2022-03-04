@@ -62,7 +62,7 @@ pub fn build_routes(
         move || api::save_world(&state)
     });
 
-    let load_world = warp::path!("load-world").and(warp::body::form()).map({
+    let load_world = warp::path!("load-world").and(warp::body::json()).map({
         let state = state.clone();
         move |data| api::load_world(&state, data)
     });
