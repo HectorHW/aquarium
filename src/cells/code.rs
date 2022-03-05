@@ -83,7 +83,7 @@ impl Distribution<OpCode> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> OpCode {
         use OpCode::*;
         let param: u8 = rng.gen();
-        match rng.gen_range(0..=17) {
+        match rng.gen_range(0..=16) {
             0 => LoadInt(param),
             1 => CopyRegisters(param.into()),
             2 => Add(param.into()),

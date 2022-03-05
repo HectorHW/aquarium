@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::cells::code::OpCode;
 
-use super::{code::Program, world::World};
+use super::{
+    code::{Program, CODE_SIZE},
+    world::World,
+};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum Direction {
@@ -116,7 +119,7 @@ impl Organism {
 
     pub fn green(energy: usize) -> Self {
         let program = Program {
-            code: [OpCode::Sythesize; 256],
+            code: [OpCode::Sythesize; CODE_SIZE],
         };
         Self::with_program(energy, 0, program)
     }
