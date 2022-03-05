@@ -46,5 +46,6 @@ Simulation also offers simple web frontend with multiple buttons that can be use
 * Spawn menu allows to spawn cells:
   * Green which will spawn cells with program of 256 photosynthesize instructions. This will most likely result in quick cell growth.
   * Random which will randomly generate programs. Please note that chance of not dying in this case is rather small, but this way should represent the beginning of life in a more realistic way.
+* Reset which will clear the field.
 * Load which allows to load previously saved field state file from your computer provided that you have the same world settings.
 * Save which allows to save all cells to your computer for later loading or sharing.
