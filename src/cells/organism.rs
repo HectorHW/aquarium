@@ -156,8 +156,6 @@ impl Organism {
             return Some(OrganismAction::Die);
         }
 
-        self.energy -= 1;
-
         for _ in 0..16 {
             match self.code[self.ip] {
                 OpCode::LoadInt(n) => {
@@ -196,14 +194,14 @@ impl Organism {
                 OpCode::Sythesize => {
                     self.next_instruction();
                     let generated = world.get_light(i);
-                    self.add_energy(generated, world.config.max_cell_size);
+                    self.add_energy(generated);
                     return None;
                 }
 
                 OpCode::Add(addr) => {
                     self.next_instruction();
                     let (from, to) = addr.unwrap();
-                    self.registers[from] += self.registers[to];
+                    self.registers[from] = self.registers[from].wrapping_add(self.registers[to]);
                 }
                 OpCode::AddClip(addr) => {
                     self.next_instruction();
@@ -271,7 +269,7 @@ impl Organism {
                     self.next_instruction();
                     let mineral_energy =
                         (*self.result_register() as usize).min(self.stored_minerals);
-                    self.add_energy(mineral_energy, world.config.max_cell_size);
+                    self.add_energy(mineral_energy);
                     self.stored_minerals -= mineral_energy;
                     return None;
                 }
@@ -300,8 +298,8 @@ impl Organism {
         None
     }
 
-    pub fn add_energy(&mut self, energy: usize, limit: usize) {
-        self.energy = (self.energy + energy).min(limit);
+    pub fn add_energy(&mut self, energy: usize) {
+        self.energy += energy;
     }
 
     pub fn decrease_energy(&mut self, energy: usize) {

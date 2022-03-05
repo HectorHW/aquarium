@@ -188,15 +188,16 @@ impl World {
         bot.age(&self.config.aging_mutation_freq);
     }
 
-    #[inline(always)]
-    fn process_bot(&mut self, (mut i, mut j): (usize, usize), mut bot: Box<Organism>) {
-        self.run_bot_prelude((i, j), bot.as_mut());
-
-        match bot.tick(self, (i, j)) {
+    fn run_bot_action(
+        &mut self,
+        (i, j): (&mut usize, &mut usize),
+        bot: &mut Organism,
+    ) -> Result<(), ()> {
+        match bot.tick(self, (*i, *j)) {
             Some(OrganismAction::TryEat(direction)) => {
                 let dead_energy = self.config.dead_energy;
                 let attack_cost = self.config.attack_cost;
-                match self.look_relative_mut((i, j), direction) {
+                match self.look_relative_mut((*i, *j), direction) {
                     Some(&mut WorldCell::Organism(ref mut other))
                         if bot.get_energy() > attack_cost =>
                     {
@@ -205,11 +206,9 @@ impl World {
                         let chance = mass_to_chance(bot.get_energy(), energy);
                         bot.decrease_energy(attack_cost);
                         if chance {
-                            bot.add_energy(
-                                energy.saturating_sub(dead_energy) / 2,
-                                self.config.max_cell_size,
-                            );
-                            *self.look_relative_mut((i, j), direction).unwrap() = WorldCell::Empty;
+                            bot.add_energy(energy.saturating_sub(dead_energy) / 2);
+                            *self.look_relative_mut((*i, *j), direction).unwrap() =
+                                WorldCell::Empty;
                         } else {
                             other.register_attack(direction.inverse());
                         }
@@ -221,7 +220,7 @@ impl World {
                             _ => unreachable!(),
                         };
                         *cell = WorldCell::Empty;
-                        bot.add_energy(energy / 2, self.config.max_cell_size);
+                        bot.add_energy(energy / 2);
                         bot.add_minerals(minerals / 2, self.config.max_minerals);
                     }
 
@@ -229,51 +228,68 @@ impl World {
                 }
             }
             Some(OrganismAction::TryMove(direction)) => {
-                if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
-                    let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
-                    i = new_i;
-                    j = new_i;
+                if let Some(WorldCell::Empty) = self.look_relative_mut((*i, *j), direction) {
+                    let (new_i, new_j) = self.relative_shift((*i, *j), direction).unwrap();
+                    *i = new_i;
+                    *j = new_i;
                     self.updates[new_i][new_j] = self.updates[new_i][new_j].wrapping_add(1);
                 }
             }
 
             Some(OrganismAction::Die) => {
-                self.field[i][j] = WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
-                return;
+                return Err(());
             }
 
             Some(OrganismAction::TryClone(child_size, child_minerals, direction)) => {
-                if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
+                if let Some(WorldCell::Empty) = self.look_relative_mut((*i, *j), direction) {
                     if let Some(child) =
                         bot.split_off(child_size, child_minerals, self.config.mutation_chance)
                     {
-                        let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
+                        let (new_i, new_j) = self.relative_shift((*i, *j), direction).unwrap();
                         self.field[new_i][new_j] = WorldCell::Organism(child);
-                        self.field[i][j] = WorldCell::Organism(bot);
-                        return;
+                        return Ok(());
                     }
                 }
             }
 
             Some(OrganismAction::ShareEnergy(amount, direction)) => {
-                let max_energy = self.config.max_cell_size;
                 if let Some(WorldCell::Organism(ref mut o)) =
-                    self.look_relative_mut((i, j), direction)
+                    self.look_relative_mut((*i, *j), direction)
                 {
-                    o.add_energy(amount, max_energy)
+                    o.add_energy(amount)
                 }
             }
 
             Some(OrganismAction::ShareMinerals(amount, direction)) => {
                 let max_minerals = self.config.max_minerals;
                 if let Some(WorldCell::Organism(ref mut o)) =
-                    self.look_relative_mut((i, j), direction)
+                    self.look_relative_mut((*i, *j), direction)
                 {
                     o.add_minerals(amount, max_minerals)
                 }
             }
 
             None => {}
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn run_bot_postlude(&mut self, (_i, _j): (usize, usize), bot: &mut Organism) {
+        // 1 is already subtracted via action
+        bot.decrease_energy(energy_soft_cap(bot.get_energy(), self.config.max_cell_size));
+    }
+
+    #[inline(always)]
+    fn process_bot(&mut self, (mut i, mut j): (usize, usize), mut bot: Box<Organism>) {
+        self.run_bot_prelude((i, j), bot.as_mut());
+
+        match self.run_bot_action((&mut i, &mut j), bot.as_mut()) {
+            Ok(_) => {}
+            Err(_) => {
+                self.field[i][j] = WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
+                return;
+            }
         }
 
         let child = if let (Ok((child_size, child_minerals)), false) = (
@@ -288,6 +304,8 @@ impl World {
         if let Some(child) = child {
             let _ = self.try_place_bot((i, j), child);
         }
+
+        self.run_bot_postlude((i, j), bot.as_mut());
 
         self.field[i][j] = WorldCell::Organism(bot);
     }
@@ -370,4 +388,9 @@ impl Display for World {
 #[inline(always)]
 fn mass_to_chance(own_mass: usize, target_mass: usize) -> bool {
     thread_rng().gen_ratio(own_mass as u32, (own_mass + target_mass + 1) as u32)
+}
+
+#[inline(always)]
+fn energy_soft_cap(mass: usize, cap: usize) -> usize {
+    (mass as f64 / cap as f64).ceil() as usize
 }
