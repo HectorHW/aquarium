@@ -49,3 +49,7 @@ Simulation also offers simple web frontend with multiple buttons that can be use
 * Reset which will clear the field.
 * Load which allows to load previously saved field state file from your computer provided that you have the same world settings.
 * Save which allows to save all cells to your computer for later loading or sharing.
+
+Heatmap-like coloring represents energy level of cells. Additional view modes may be implemented in the future.
+
+It is also possible to view particular cell's state and code direcly. In order to do that, pause the simulation (otherwise you most likely will miss the desired cell) and click on the square corresponding to the cell you want to view. A new page containing information about cell's minerals, energy, instruction pointer, registers and code will appear.
