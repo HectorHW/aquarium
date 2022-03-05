@@ -38,3 +38,13 @@ In order to prevent appearance of never-dying, non-breeding species aging mechan
 ## Interaction with the simulation
 
 Simulation also offers simple web frontend with multiple buttons that can be used to alter the time flow or content of simulation.
+
+![aquarium_web](https://user-images.githubusercontent.com/29350307/156882481-95306f45-d69b-41cc-93e0-bce8428ffcf5.png)
+
+* Synced/Unsynced button allows to switch between update modes. In synced mode every simulation tick corresponds to one diplay update (Please note that this may largely slow down the simulation). In unsynced mode server is polled every 500ms. This allows the server to run simulation with less interuption and perform close to maximum tick rate, but results in jumpy, non-smooth display behavior.
+* Paused/Unpaused button allows to stop the simulation. This may be useful for taking screenshots or observing cell state.
+* Spawn menu allows to spawn cells:
+  * Green which will spawn cells with program of 256 photosynthesize instructions. This will most likely result in quick cell growth.
+  * Random which will randomly generate programs. Please note that chance of not dying in this case is rather small, but this way should represent the beginning of life in a more realistic way.
+* Load which allows to load previously saved field state file from your computer provided that you have the same world settings.
+* Save which allows to save all cells to your computer for later loading or sharing.
