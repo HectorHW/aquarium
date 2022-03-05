@@ -34,3 +34,7 @@ Bacteria require energy to operate. When the energy drops to zero, they die leav
 * Getting energy (and minerals) from other bacteria if they share it. This in theory, combined with ability to see genetic difference of neighboring bacteria, allow creation of simple multicellular organisms (which was in fact observed trice at least).
   
 In order to prevent appearance of never-dying, non-breeding species aging mechanism was introduced. With some small probability (1/1000 right now) bacterium's code may break (by randomly changing single instruction) on every simulation tick.
+
+## Interaction with the simulation
+
+Simulation also offers simple web frontend with multiple buttons that can be used to alter the time flow or content of simulation.
