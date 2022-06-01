@@ -2,7 +2,6 @@ extern crate rand;
 
 use std::sync::Arc;
 
-use num::Saturating;
 use rand::distributions::Bernoulli;
 use std::thread;
 use std::time::Duration;
@@ -39,7 +38,7 @@ async fn main() {
         max_cell_size: 500,
         minerals_behaviour: |i| {
             let distance_from_bottom = 50 - i - 1;
-            3.saturating_sub(distance_from_bottom / 10)
+            3usize.saturating_sub(distance_from_bottom / 10)
         },
         max_minerals: 100,
         attack_cost: 10,

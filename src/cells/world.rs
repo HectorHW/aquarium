@@ -4,7 +4,6 @@ use std::{
     ops::{Index, IndexMut},
 };
 
-use num_bigint::BigUint;
 use rand::{distributions::Bernoulli, prelude::SliceRandom, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
@@ -73,7 +72,7 @@ pub struct World {
     width: usize,
 
     pub config: WorldConfig,
-    pub total_steps: BigUint,
+    pub measure_steps: usize,
 }
 
 impl World {
@@ -88,7 +87,7 @@ impl World {
             updates: vec![0; WIDTH * HEIGHT],
             width: WIDTH,
             config,
-            total_steps: BigUint::from(0usize),
+            measure_steps: 0usize,
         }
     }
 
@@ -386,7 +385,7 @@ impl World {
         }
 
         self.iteration = self.iteration.wrapping_add(1);
-        self.total_steps += BigUint::from(1usize);
+        self.measure_steps += 1;
     }
 }
 
