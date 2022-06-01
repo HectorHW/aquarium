@@ -1,3 +1,5 @@
+use std::vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::cells::world::{World, WorldCell};
@@ -15,25 +17,27 @@ pub struct SerializedWorld {
 }
 
 pub fn store_world_shallow(world: &World) -> SerializedWorld {
-    SerializedWorld {
-        cells: world
-            .field
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|cell| match cell {
-                        WorldCell::Empty => SerializedCell::Empty,
-                        WorldCell::Organism(o) => SerializedCell::Alive {
-                            energy: o.get_energy(),
-                            minerals: o.get_minerals(),
-                        },
-                        WorldCell::DeadBody(energy, minerals) => SerializedCell::Dead {
-                            energy: *energy,
-                            minerals: *minerals,
-                        },
-                    })
-                    .collect()
-            })
-            .collect(),
+    let mut cells = vec![];
+
+    for i in 0..world.field.get_height() {
+        let mut row = vec![];
+
+        for j in 0..world.field.get_width() {
+            let cell = match &world.field[(i, j)] {
+                WorldCell::Empty => SerializedCell::Empty,
+                WorldCell::Organism(o) => SerializedCell::Alive {
+                    energy: o.get_energy(),
+                    minerals: o.get_minerals(),
+                },
+                WorldCell::DeadBody(energy, minerals) => SerializedCell::Dead {
+                    energy: *energy,
+                    minerals: *minerals,
+                },
+            };
+            row.push(cell);
+        }
+        cells.push(row);
     }
+
+    SerializedWorld { cells }
 }

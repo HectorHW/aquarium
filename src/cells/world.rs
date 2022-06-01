@@ -1,7 +1,7 @@
 use std::{
     fmt::Display,
     mem,
-    ops::{Deref, DerefMut},
+    ops::{Index, IndexMut},
 };
 
 use num_bigint::BigUint;
@@ -32,26 +32,45 @@ pub enum WorldCell {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WorldField(Vec<Vec<WorldCell>>);
+pub struct WorldField {
+    pub inner: Vec<WorldCell>,
+    width: usize,
+}
 
-impl Deref for WorldField {
-    type Target = Vec<Vec<WorldCell>>;
+impl Index<(usize, usize)> for WorldField {
+    type Output = WorldCell;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    fn index(&self, (i, j): (usize, usize)) -> &Self::Output {
+        &self.inner[i * self.width + j]
     }
 }
 
-impl DerefMut for WorldField {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl IndexMut<(usize, usize)> for WorldField {
+    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut Self::Output {
+        &mut self.inner[i * self.width + j]
+    }
+}
+
+impl WorldField {
+    pub fn get(&self, (i, j): (usize, usize)) -> Option<&WorldCell> {
+        let pos = i * self.width + j;
+        self.inner.get(pos)
+    }
+
+    pub fn get_width(&self) -> usize {
+        self.width
+    }
+
+    pub fn get_height(&self) -> usize {
+        self.inner.len() / self.width
     }
 }
 
 pub struct World {
     pub field: WorldField,
     iteration: usize,
-    updates: Vec<Vec<usize>>,
+    updates: Vec<usize>,
+    width: usize,
 
     pub config: WorldConfig,
     pub total_steps: BigUint,
@@ -59,11 +78,15 @@ pub struct World {
 
 impl World {
     pub fn empty<const WIDTH: usize, const HEIGHT: usize>(config: WorldConfig) -> Self {
-        let field = vec![vec![WorldCell::Empty; WIDTH]; HEIGHT];
+        let field = vec![WorldCell::Empty; WIDTH * HEIGHT];
         World {
-            field: WorldField(field),
+            field: WorldField {
+                width: WIDTH,
+                inner: field,
+            },
             iteration: 1,
-            updates: vec![vec![0; WIDTH]; HEIGHT],
+            updates: vec![WIDTH * HEIGHT],
+            width: WIDTH,
             config,
             total_steps: BigUint::from(0usize),
         }
@@ -71,9 +94,9 @@ impl World {
 
     fn get_free_cells(&self) -> Vec<(usize, usize)> {
         let mut res = vec![];
-        for (i, row) in self.field.iter().enumerate() {
-            for (j, cell) in row.iter().enumerate() {
-                if matches!(cell, &WorldCell::Empty) {
+        for j in 0..self.field.width {
+            for i in 0..self.field.inner.len() / self.field.width {
+                if matches!(self.field[(i, j)], WorldCell::Empty) {
                     res.push((i, j));
                 }
             }
@@ -97,7 +120,7 @@ impl World {
 
             let organism = bot_factory(self.config.start_energy);
 
-            self.field[i][j] = WorldCell::Organism(Box::new(organism));
+            self.field[(i, j)] = WorldCell::Organism(Box::new(organism));
             number_of_bots -= 1;
         }
 
@@ -117,11 +140,19 @@ impl World {
     }
 
     pub fn get_width(&self) -> usize {
-        self.field[0].len()
+        self.width
     }
 
     pub fn get_height(&self) -> usize {
-        self.field.len()
+        self.field.inner.len() / self.width
+    }
+
+    fn get_update(&self, (i, j): (usize, usize)) -> usize {
+        self.updates[i * self.width + j]
+    }
+
+    fn get_update_mut(&mut self, (i, j): (usize, usize)) -> &mut usize {
+        &mut self.updates[i * self.width + j]
     }
 
     pub fn relative_shift(
@@ -161,7 +192,7 @@ impl World {
         direction: Direction,
     ) -> Option<&mut WorldCell> {
         let (i, j) = self.relative_shift((i, j), direction)?;
-        Some(&mut self.field[i][j])
+        Some(&mut self.field[(i, j)])
     }
 
     pub fn look_relative(
@@ -170,7 +201,7 @@ impl World {
         direction: Direction,
     ) -> Option<&WorldCell> {
         let (i, j) = self.relative_shift((i, j), direction)?;
-        Some(&self.field[i][j])
+        Some(&self.field[(i, j)])
     }
 
     pub fn get_light(&self, i: usize) -> usize {
@@ -232,7 +263,7 @@ impl World {
                     let (new_i, new_j) = self.relative_shift((*i, *j), direction).unwrap();
                     *i = new_i;
                     *j = new_i;
-                    self.updates[new_i][new_j] = self.updates[new_i][new_j].wrapping_add(1);
+                    *self.get_update_mut((*i, *j)) = self.get_update((*i, *j)).wrapping_add(1);
                 }
             }
 
@@ -245,8 +276,8 @@ impl World {
                     if let Some(child) =
                         bot.split_off(child_size, child_minerals, self.config.mutation_chance)
                     {
-                        let (new_i, new_j) = self.relative_shift((*i, *j), direction).unwrap();
-                        self.field[new_i][new_j] = WorldCell::Organism(child);
+                        let pos = self.relative_shift((*i, *j), direction).unwrap();
+                        self.field[pos] = WorldCell::Organism(child);
                         return Ok(());
                     }
                 }
@@ -287,7 +318,8 @@ impl World {
         match self.run_bot_action((&mut i, &mut j), bot.as_mut()) {
             Ok(_) => {}
             Err(_) => {
-                self.field[i][j] = WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
+                self.field[(i, j)] =
+                    WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
                 return;
             }
         }
@@ -307,7 +339,7 @@ impl World {
 
         self.run_bot_postlude((i, j), bot.as_mut());
 
-        self.field[i][j] = WorldCell::Organism(bot);
+        self.field[(i, j)] = WorldCell::Organism(bot);
     }
 
     #[inline]
@@ -321,8 +353,8 @@ impl World {
         directions.shuffle(&mut thread_rng());
         for direction in directions {
             if let Some(WorldCell::Empty) = self.look_relative_mut((i, j), direction) {
-                let (new_i, new_j) = self.relative_shift((i, j), direction).unwrap();
-                self.field[new_i][new_j] = WorldCell::Organism(bot);
+                let pos = self.relative_shift((i, j), direction).unwrap();
+                self.field[pos] = WorldCell::Organism(bot);
                 return Ok(());
             }
         }
@@ -332,24 +364,24 @@ impl World {
     pub fn tick(&mut self) {
         for i in 0..self.get_height() {
             for j in 0..self.get_width() {
-                if self.updates[i][j] == self.iteration {
+                if self.get_update((i, j)) == self.iteration {
                     continue;
                 }
 
                 let mut possible_bot = WorldCell::Empty;
-                mem::swap(&mut self.field[i][j], &mut possible_bot);
+                mem::swap(&mut self.field[(i, j)], &mut possible_bot);
 
                 match possible_bot {
                     WorldCell::Organism(o) => {
                         self.process_bot((i, j), o);
                     }
                     b @ WorldCell::DeadBody(..) => {
-                        self.field[i][j] = b;
+                        self.field[(i, j)] = b;
                     }
                     _ => {}
                 }
 
-                self.updates[i][j] = self.updates[i][j].wrapping_add(1);
+                *self.get_update_mut((i, j)) = self.get_update((i, j)).wrapping_add(1);
             }
         }
 
@@ -365,7 +397,7 @@ impl Display for World {
                 write!(
                     f,
                     "{: <4}",
-                    match &self.field[i][j] {
+                    match &self.field[(i, j)] {
                         WorldCell::Empty => {
                             " ".to_string()
                         }

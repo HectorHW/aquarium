@@ -47,7 +47,6 @@ async fn main() {
 
     let state = Arc::new(parking_lot::Mutex::new({
         let mut world = World::empty::<100, 50>(config);
-        //world.populate_green(500).unwrap();
         ServerState {
             paused: false,
             target_tps: 0,

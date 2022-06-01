@@ -46,7 +46,7 @@ pub fn set_tps(state: &AMState, tps: u64) -> impl warp::Reply {
 
 pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
     let state = state.lock();
-    match state.world.field.get(i).and_then(|row| row.get(j)) {
+    match state.world.field.get((i, j)) {
         Some(cell) => warp::reply::with_status(
             match cell {
                 WorldCell::Empty => "empty cell".to_string(),
@@ -138,8 +138,9 @@ pub fn reset(state: &AMState) -> impl warp::Reply {
     let world = &mut state.world;
     world
         .field
+        .inner
         .iter_mut()
-        .for_each(|row| row.iter_mut().for_each(|cell| *cell = WorldCell::Empty));
+        .for_each(|cell| *cell = WorldCell::Empty);
     warp::reply()
 }
 
