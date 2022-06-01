@@ -262,7 +262,7 @@ impl World {
                 if let Some(WorldCell::Empty) = self.look_relative_mut((*i, *j), direction) {
                     let (new_i, new_j) = self.relative_shift((*i, *j), direction).unwrap();
                     *i = new_i;
-                    *j = new_i;
+                    *j = new_j;
                     *self.get_update_mut((*i, *j)) = self.get_update((*i, *j)).wrapping_add(1);
                 }
             }
