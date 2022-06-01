@@ -85,7 +85,7 @@ impl World {
                 inner: field,
             },
             iteration: 1,
-            updates: vec![WIDTH * HEIGHT],
+            updates: vec![0; WIDTH * HEIGHT],
             width: WIDTH,
             config,
             total_steps: BigUint::from(0usize),
