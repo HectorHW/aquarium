@@ -22,10 +22,7 @@ pub fn pause(state: &AMState) -> Response<String> {
     state.paused = !state.paused;
 
     Response::builder()
-        .header(
-            "pause-state",
-            format!("{}", if state.paused { 1 } else { 0 }),
-        )
+        .header("pause-state", format!("{}", i32::from(state.paused)))
         .body("".to_string())
         .unwrap()
 }

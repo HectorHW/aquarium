@@ -26,7 +26,7 @@ impl<const N: usize> ObjectCache<N> {
 }
 
 impl<'de, const N: usize> Deserialize<'de> for ObjectCache<N> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {

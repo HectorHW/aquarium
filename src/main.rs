@@ -46,7 +46,7 @@ async fn main() {
     };
 
     let state = Arc::new(parking_lot::Mutex::new({
-        let mut world = World::empty::<100, 50>(config);
+        let world = World::empty::<100, 50>(config);
         ServerState {
             paused: false,
             target_tps: 0,

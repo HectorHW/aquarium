@@ -216,7 +216,7 @@ impl Organism {
                 OpCode::Flip(addr) => {
                     self.next_instruction();
                     let addr = addr.unwrap();
-                    self.registers[addr] = if self.registers[addr] != 0 { 1 } else { 0 };
+                    self.registers[addr] = u8::from(self.registers[addr] != 0);
                 }
                 OpCode::JumpUnconditional(shift) => {
                     self.jump(shift as usize);
