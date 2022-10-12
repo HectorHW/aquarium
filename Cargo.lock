@@ -21,6 +21,7 @@ dependencies = [
  "serde",
  "serde-big-array",
  "serde_json",
+ "sized-vec",
  "tokio",
  "warp",
 ]
@@ -948,6 +949,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "sized-vec"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5985e3944437a472b2059be8671eae6ab8e067324fd3a7161af28c22d1f11367"
+dependencies = [
+ "typenum",
 ]
 
 [[package]]

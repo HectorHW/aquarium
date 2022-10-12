@@ -17,6 +17,7 @@ use state::ServerState;
 use crate::cells::world::WorldConfig;
 use crate::state::SpeedMeasure;
 
+mod cachealloc;
 mod routes;
 mod serialization;
 
