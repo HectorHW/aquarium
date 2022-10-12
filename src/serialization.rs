@@ -2,7 +2,7 @@ use std::vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::cells::world::{World, WorldCell};
+use crate::cells::world::{World, WorldCellInner};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SerializedCell {
@@ -24,12 +24,12 @@ pub fn store_world_shallow(world: &World) -> SerializedWorld {
 
         for j in 0..world.field.get_width() {
             let cell = match &world.field[(i, j)] {
-                WorldCell::Empty => SerializedCell::Empty,
-                WorldCell::Organism(o) => SerializedCell::Alive {
+                WorldCellInner::Empty => SerializedCell::Empty,
+                WorldCellInner::Organism(o) => SerializedCell::Alive {
                     energy: o.get_energy(),
                     minerals: o.get_minerals(),
                 },
-                WorldCell::DeadBody(energy, minerals) => SerializedCell::Dead {
+                WorldCellInner::DeadBody(energy, minerals) => SerializedCell::Dead {
                     energy: *energy,
                     minerals: *minerals,
                 },

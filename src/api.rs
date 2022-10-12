@@ -4,7 +4,7 @@ use warp::{
 };
 
 use crate::{
-    cells::world::{WorldCell, WorldField},
+    cells::world::{WorldCellInner, WorldField},
     serialization::store_world_shallow,
     state::AMState,
 };
@@ -22,10 +22,7 @@ pub fn pause(state: &AMState) -> Response<String> {
     state.paused = !state.paused;
 
     Response::builder()
-        .header(
-            "pause-state",
-            format!("{}", if state.paused { 1 } else { 0 }),
-        )
+        .header("pause-state", format!("{}", i32::from(state.paused)))
         .body("".to_string())
         .unwrap()
 }
@@ -49,8 +46,8 @@ pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
     match state.world.field.get((i, j)) {
         Some(cell) => warp::reply::with_status(
             match cell {
-                WorldCell::Empty => "empty cell".to_string(),
-                WorldCell::Organism(bot) => {
+                WorldCellInner::Empty => "empty cell".to_string(),
+                WorldCellInner::Organism(bot) => {
                     format!(
                         "
                     {}
@@ -58,7 +55,7 @@ pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
                         bot
                     )
                 }
-                WorldCell::DeadBody(..) => "dead body".to_string(),
+                WorldCellInner::DeadBody(..) => "dead body".to_string(),
             },
             StatusCode::OK,
         ),
@@ -140,7 +137,7 @@ pub fn reset(state: &AMState) -> impl warp::Reply {
         .field
         .inner
         .iter_mut()
-        .for_each(|cell| *cell = WorldCell::Empty);
+        .for_each(|cell| *cell.as_mut() = WorldCellInner::Empty);
     warp::reply()
 }
 

@@ -7,7 +7,7 @@ use crate::cells::code::OpCode;
 
 use super::{
     code::{Program, CODE_SIZE},
-    world::World,
+    world::{World, WorldCellInner},
 };
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -26,6 +26,16 @@ impl Direction {
             Direction::Down => Direction::Left,
             Direction::Left => Direction::Up,
             Direction::Right => Direction::Down,
+        }
+    }
+
+    pub fn get_random() -> Direction {
+        match thread_rng().gen_range(0..=3) {
+            0 => Direction::Up,
+            1 => Direction::Down,
+            2 => Direction::Left,
+            3 => Direction::Right,
+            _ => unreachable!(),
         }
     }
 
@@ -174,16 +184,16 @@ impl Organism {
                 OpCode::LookRelative => {
                     self.next_instruction();
                     let direction = self.get_direction();
-                    let world_cell = world.look_relative((i, j), direction);
+                    let world_cell = world.field.look_relative((i, j), direction);
                     *self.result_register() = match world_cell {
-                        Some(super::world::WorldCell::Empty) => 0,
+                        Some(super::world::WorldCellInner::Empty) => 0,
 
-                        Some(super::world::WorldCell::Organism(o)) => {
+                        Some(super::world::WorldCellInner::Organism(o)) => {
                             *self.result2_register() =
                                 into_u8_fraction(o.get_energy(), world.config.max_cell_size);
                             1
                         }
-                        Some(super::world::WorldCell::DeadBody(..)) => 2,
+                        Some(super::world::WorldCellInner::DeadBody(..)) => 2,
                         None => 255,
                     };
                 }
@@ -193,7 +203,7 @@ impl Organism {
                 }
                 OpCode::Sythesize => {
                     self.next_instruction();
-                    let generated = world.get_light(i);
+                    let generated = World::get_light(&world.config, i);
                     self.add_energy(generated);
                     return None;
                 }
@@ -216,7 +226,7 @@ impl Organism {
                 OpCode::Flip(addr) => {
                     self.next_instruction();
                     let addr = addr.unwrap();
-                    self.registers[addr] = if self.registers[addr] != 0 { 1 } else { 0 };
+                    self.registers[addr] = u8::from(self.registers[addr] != 0);
                 }
                 OpCode::JumpUnconditional(shift) => {
                     self.jump(shift as usize);
@@ -247,9 +257,9 @@ impl Organism {
                 OpCode::Compare => {
                     self.next_instruction();
                     let direction = self.get_direction();
-                    let world_cell = world.look_relative((i, j), direction);
+                    let world_cell = world.field.look_relative((i, j), direction);
                     *self.result_register() = match world_cell {
-                        Some(super::world::WorldCell::Organism(other)) => {
+                        Some(super::world::WorldCellInner::Organism(other)) => {
                             *self.result2_register() =
                                 into_u8_fraction(other.get_energy(), world.config.max_cell_size);
 
@@ -260,7 +270,7 @@ impl Organism {
                                 .count()
                                 .max(255) as u8
                         }
-                        Some(super::world::WorldCell::DeadBody(..)) => 255,
+                        Some(super::world::WorldCellInner::DeadBody(..)) => 255,
                         _ => 0,
                     };
                 }
@@ -311,7 +321,7 @@ impl Organism {
     }
 
     #[inline(always)]
-    fn get_direction(&self) -> Direction {
+    pub fn get_direction(&self) -> Direction {
         self.registers[2].into()
     }
 
@@ -337,20 +347,22 @@ impl Organism {
         self.registers[7] = direction.into();
     }
 
-    pub fn split_off(
+    pub fn try_clone_into(
         &mut self,
+        target: &mut WorldCellInner,
         energy: usize,
         minerals: usize,
         mutation_chance: usize,
-    ) -> Option<Box<Organism>> {
+    ) -> bool {
         if self.energy >= energy * 2 {
             let child_program = self.code.clone_lossy(mutation_chance);
-            let child = Box::new(Self::with_program(energy, minerals, child_program));
+            let child = Self::with_program(energy, minerals, child_program);
             self.energy -= energy;
             self.stored_minerals -= minerals;
-            Some(child)
+            *target = WorldCellInner::Organism(child);
+            true
         } else {
-            None
+            false
         }
     }
 
