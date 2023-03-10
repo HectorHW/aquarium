@@ -2,7 +2,9 @@ use std::{collections::HashMap, sync::Arc, time::Instant};
 
 use crate::cells::world::World;
 
-pub type AMState = Arc<parking_lot::Mutex<ServerState>>;
+pub type AMState = Arc<MState>;
+
+pub type MState = parking_lot::Mutex<ServerState>;
 
 #[derive(Clone, Debug)]
 pub struct SpeedMeasure {
@@ -45,6 +47,7 @@ pub struct ServerState {
     pub target_tps: u64,
     pub stats: SpeedMeasure,
     pub world: World,
+    pub password: String,
 }
 
 impl ServerState {
