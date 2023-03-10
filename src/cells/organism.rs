@@ -216,7 +216,7 @@ impl Organism {
                 OpCode::Flip(addr) => {
                     self.next_instruction();
                     let addr = addr.unwrap();
-                    self.registers[addr] = if self.registers[addr] != 0 { 1 } else { 0 };
+                    self.registers[addr] = u8::from(self.registers[addr] != 0);
                 }
                 OpCode::JumpUnconditional(shift) => {
                     self.jump(shift as usize);
@@ -337,18 +337,24 @@ impl Organism {
         self.registers[7] = direction.into();
     }
 
-    pub fn split_off(
+    pub fn split_off<F: FnOnce() -> Box<Organism>>(
         &mut self,
+        allocation: F,
         energy: usize,
         minerals: usize,
         mutation_chance: usize,
     ) -> Option<Box<Organism>> {
         if self.energy >= energy * 2 {
+            let mut alloc = allocation();
+
             let child_program = self.code.clone_lossy(mutation_chance);
-            let child = Box::new(Self::with_program(energy, minerals, child_program));
+            let bot = Self::with_program(energy, minerals, child_program);
+
+            *alloc.as_mut() = bot;
+
             self.energy -= energy;
             self.stored_minerals -= minerals;
-            Some(child)
+            Some(alloc)
         } else {
             None
         }
@@ -379,6 +385,12 @@ impl Display for Organism {
             self.ip,
             self.code
         )
+    }
+}
+
+impl Default for Organism {
+    fn default() -> Self {
+        Organism::green(20)
     }
 }
 

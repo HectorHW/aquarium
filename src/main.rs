@@ -3,6 +3,7 @@ extern crate rand;
 use std::sync::Arc;
 
 use rand::distributions::Bernoulli;
+
 use std::thread;
 use std::time::Duration;
 use tokio::task;
@@ -17,11 +18,13 @@ use state::ServerState;
 use crate::cells::world::WorldConfig;
 use crate::state::SpeedMeasure;
 
+mod cachealloc;
 mod routes;
 mod serialization;
+use actix_web::{App, HttpServer};
 
-#[tokio::main]
-async fn main() {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     let config = WorldConfig {
         start_energy: 40,
         dead_energy: 20,
@@ -45,12 +48,13 @@ async fn main() {
     };
 
     let state = Arc::new(parking_lot::Mutex::new({
-        let mut world = World::empty::<100, 50>(config);
+        let world = World::empty::<100, 50>(config);
         ServerState {
             paused: false,
             target_tps: 0,
             stats: SpeedMeasure::new(),
             world,
+            password: "1234".to_string(),
         }
     }));
 
@@ -88,7 +92,19 @@ async fn main() {
         })
     };
 
-    let routes = routes::build_routes(state);
-    println!("http://127.0.0.1:8000");
-    warp::serve(routes).run(([0, 0, 0, 0], 8000)).await;
+    println!("http://127.0.0.1:8000/aquarium");
+
+    ctrlc::set_handler(move || {
+        println!("got SIGINT, exiting");
+        std::process::exit(0)
+    })
+    .unwrap();
+
+    HttpServer::new({
+        let state = state.clone();
+        move || App::new().service(routes::build_routes(state.clone(), "aquarium"))
+    })
+    .bind(("0.0.0.0", 8000))?
+    .run()
+    .await
 }

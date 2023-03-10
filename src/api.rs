@@ -1,115 +1,118 @@
-use warp::{
-    hyper::{Response, StatusCode},
-    reply::Json,
-};
-
 use crate::{
     cells::world::{WorldCell, WorldField},
     serialization::store_world_shallow,
-    state::AMState,
+    state::MState,
 };
 
-pub fn get_map(state: &AMState) -> Json {
+use actix_web::{
+    get, post,
+    web::{Data, Json, Path},
+    HttpResponse, Responder,
+};
+
+#[get("/world")]
+pub async fn get_map(state: Data<MState>) -> impl Responder {
     let state = state.lock();
     let world = &state.world;
 
-    warp::reply::json(&store_world_shallow(world))
+    Json(store_world_shallow(world))
 }
 
-pub fn pause(state: &AMState) -> Response<String> {
+#[post("/pause")]
+pub async fn pause(state: Data<MState>) -> impl Responder {
     let mut state = state.lock();
 
     state.paused = !state.paused;
 
-    Response::builder()
-        .header(
-            "pause-state",
-            format!("{}", if state.paused { 1 } else { 0 }),
-        )
-        .body("".to_string())
-        .unwrap()
+    HttpResponse::Ok()
+        .append_header(("pause-state", format!("{}", i32::from(state.paused))))
+        .body("")
 }
 
-pub fn set_tps(state: &AMState, tps: u64) -> impl warp::Reply {
-    if !(0..=1000).contains(&tps) {
-        return warp::reply::with_status(
-            format!("invalid tps value {}", tps),
-            StatusCode::BAD_REQUEST,
-        );
+#[post("/set-tps")]
+pub async fn set_tps(state: Data<MState>, tps: Json<u64>) -> HttpResponse {
+    if !(0..=1000).contains(&tps.0) {
+        return HttpResponse::BadRequest().body(format!("invalid tps value {}", tps));
     }
 
     let mut state = state.lock();
-    state.target_tps = tps;
+    state.target_tps = tps.0;
 
-    warp::reply::with_status(format!("set tps to {tps}"), StatusCode::OK)
+    HttpResponse::Ok().body(format!("set tps to {tps}"))
 }
 
-pub fn inspect(state: &AMState, (i, j): (usize, usize)) -> impl warp::Reply {
+#[get("/inspect/{i}/{j}")]
+pub async fn inspect(state: Data<MState>, idx: Path<(usize, usize)>) -> impl Responder {
+    //let i: usize = req.match_info().get("i");
+    //let (i, j) = params.into_inner();
+    let (i, j) = *idx;
+
     let state = state.lock();
     match state.world.field.get((i, j)) {
-        Some(cell) => warp::reply::with_status(
-            match cell {
-                WorldCell::Empty => "empty cell".to_string(),
-                WorldCell::Organism(bot) => {
-                    format!(
-                        "
+        Some(cell) => HttpResponse::Ok().body(match cell {
+            WorldCell::Empty => "empty cell".to_string(),
+            WorldCell::Organism(bot) => {
+                format!(
+                    "
                     {}
                     ",
-                        bot
-                    )
-                }
-                WorldCell::DeadBody(..) => "dead body".to_string(),
-            },
-            StatusCode::OK,
-        ),
-        None => warp::reply::with_status(
-            format!("({}, {}) out of bounds", i, j),
-            StatusCode::BAD_REQUEST,
-        ),
+                    bot
+                )
+            }
+            WorldCell::DeadBody(..) => "dead body".to_string(),
+        }),
+        None => HttpResponse::NotFound().body(format!("({}, {}) out of bounds", i, j)),
     }
 }
 
-pub fn stats(state: &AMState) -> Json {
+#[get("/stats")]
+pub async fn stats(state: Data<MState>) -> impl Responder {
     let state = state.lock();
     let mut stats = state.stats.as_dict();
     stats.insert(
         "is_paused",
         if state.paused { "1" } else { "0" }.to_string(),
     );
-    warp::reply::json(&stats)
+    Json(stats.clone())
 }
 
-pub fn spawn_random(state: &AMState, bots: usize) -> impl warp::Reply {
+#[post("/spawn-random")]
+pub async fn spawn_random(state: Data<MState>, bots: Json<usize>) -> impl Responder {
     let mut state = state.lock();
     let world = &mut state.world;
-    match world.populate_random(bots) {
-        Ok(_) => warp::reply::with_status("".to_string(), StatusCode::CREATED),
-        Err(n) => {
-            warp::reply::with_status(format!("failed to add {} bots", n), StatusCode::CONFLICT)
-        }
+    match world.populate_random(bots.0) {
+        Ok(_) => HttpResponse::Created().finish(),
+        Err(n) => HttpResponse::Conflict().body(format!("failed to add {} bots", n)),
     }
 }
 
-pub fn spawn_green(state: &AMState, bots: usize) -> impl warp::Reply {
+#[post("/spawn-green")]
+pub async fn spawn_green(state: Data<MState>, bots: Json<usize>) -> impl Responder {
     let mut state = state.lock();
     let world = &mut state.world;
-    match world.populate_green(bots) {
-        Ok(_) => warp::reply::with_status("".to_string(), StatusCode::CREATED),
-        Err(n) => {
-            warp::reply::with_status(format!("failed to add {} bots", n), StatusCode::CONFLICT)
-        }
+    match world.populate_green(bots.0) {
+        Ok(_) => HttpResponse::Created().finish(),
+        Err(n) => HttpResponse::Conflict().body(format!("failed to add {} bots", n)),
     }
 }
 
-pub fn tick(state: &AMState) -> Json {
+#[post("/tick")]
+pub async fn tick(state: Data<MState>) -> impl Responder {
     let mut state = state.lock();
     let world = &mut state.world;
     world.tick();
-    warp::reply::json(&store_world_shallow(world))
+    Json(store_world_shallow(world))
 }
 
-pub fn set_setting(state: &AMState, key: String, value: usize) -> impl warp::Reply {
+#[post("/set-config/{key}")]
+pub async fn set_setting(
+    state: Data<MState>,
+    key: Path<String>,
+    value: Json<usize>,
+) -> impl Responder {
     let mut state = state.lock();
+    let key = key.into_inner();
+    let value = value.0;
     match key.as_str() {
         "mutation_chance" => {
             state.world.config.mutation_chance = value;
@@ -124,16 +127,14 @@ pub fn set_setting(state: &AMState, key: String, value: usize) -> impl warp::Rep
         }
 
         other => {
-            return warp::reply::with_status(
-                format!("parameter not found: {}", other),
-                StatusCode::BAD_REQUEST,
-            );
+            return HttpResponse::BadRequest().body(format!("parameter not found: {}", other));
         }
     }
-    warp::reply::with_status("ok".to_string(), StatusCode::OK)
+    HttpResponse::Ok().finish()
 }
 
-pub fn reset(state: &AMState) -> impl warp::Reply {
+#[post("/reset")]
+pub async fn reset(state: Data<MState>) -> impl Responder {
     let mut state = state.lock();
     let world = &mut state.world;
     world
@@ -141,18 +142,21 @@ pub fn reset(state: &AMState) -> impl warp::Reply {
         .inner
         .iter_mut()
         .for_each(|cell| *cell = WorldCell::Empty);
-    warp::reply()
+    HttpResponse::Ok()
 }
 
-pub fn save_world(state: &AMState) -> Json {
+#[get("/save-world")]
+pub async fn save_world(state: Data<MState>) -> impl Responder {
     let state = state.lock();
     let world = &state.world;
 
-    warp::reply::json(&world.field)
+    Json(world.field.clone())
 }
 
-pub fn load_world(state: &AMState, data: WorldField) -> impl warp::Reply {
+#[post("/load-world")]
+pub async fn load_world(state: Data<MState>, data: Json<WorldField>) -> impl Responder {
+    let data = data.0;
     let mut state = state.lock();
     state.world.field = data;
-    warp::reply()
+    HttpResponse::Ok()
 }

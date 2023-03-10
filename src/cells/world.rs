@@ -7,6 +7,8 @@ use std::{
 use rand::{distributions::Bernoulli, prelude::SliceRandom, thread_rng, Rng};
 use serde::{Deserialize, Serialize};
 
+use crate::cachealloc::ObjectCache;
+
 use super::organism::{Direction, Organism, OrganismAction};
 
 #[derive(Clone, Debug)]
@@ -33,6 +35,10 @@ pub enum WorldCell {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorldField {
     pub inner: Vec<WorldCell>,
+
+    #[serde(skip_serializing)]
+    #[serde(default)]
+    cache: ObjectCache<2500>,
     width: usize,
 }
 
@@ -82,6 +88,7 @@ impl World {
             field: WorldField {
                 width: WIDTH,
                 inner: field,
+                cache: Default::default(),
             },
             iteration: 1,
             updates: vec![0; WIDTH * HEIGHT],
@@ -117,9 +124,10 @@ impl World {
                 break;
             }
 
-            let organism = bot_factory(self.config.start_energy);
+            let mut allocation = self.field.cache.get_alloc();
+            *allocation.as_mut() = bot_factory(self.config.start_energy);
 
-            self.field[(i, j)] = WorldCell::Organism(Box::new(organism));
+            self.field[(i, j)] = WorldCell::Organism(allocation);
             number_of_bots -= 1;
         }
 
@@ -272,9 +280,12 @@ impl World {
 
             Some(OrganismAction::TryClone(child_size, child_minerals, direction)) => {
                 if let Some(WorldCell::Empty) = self.look_relative_mut((*i, *j), direction) {
-                    if let Some(child) =
-                        bot.split_off(child_size, child_minerals, self.config.mutation_chance)
-                    {
+                    if let Some(child) = bot.split_off(
+                        || self.field.cache.get_alloc(),
+                        child_size,
+                        child_minerals,
+                        self.config.mutation_chance,
+                    ) {
                         let pos = self.relative_shift((*i, *j), direction).unwrap();
                         self.field[pos] = WorldCell::Organism(child);
                         return Ok(());
@@ -319,6 +330,9 @@ impl World {
             Err(_) => {
                 self.field[(i, j)] =
                     WorldCell::DeadBody(self.config.dead_energy, bot.get_minerals());
+
+                self.field.cache.store_drop(bot);
+
                 return;
             }
         }
@@ -327,13 +341,20 @@ impl World {
             (self.config.split_behaviour)(bot.get_energy(), bot.get_minerals()),
             bot.can_clone,
         ) {
-            bot.split_off(child_size, child_minerals, self.config.mutation_chance)
+            bot.split_off(
+                || self.field.cache.get_alloc(),
+                child_size,
+                child_minerals,
+                self.config.mutation_chance,
+            )
         } else {
             None
         };
 
         if let Some(child) = child {
-            let _ = self.try_place_bot((i, j), child);
+            if let Err(bot) = self.try_place_bot((i, j), child) {
+                self.field.cache.store_drop(bot);
+            }
         }
 
         self.run_bot_postlude((i, j), bot.as_mut());
@@ -342,7 +363,11 @@ impl World {
     }
 
     #[inline]
-    fn try_place_bot(&mut self, (i, j): (usize, usize), bot: Box<Organism>) -> Result<(), ()> {
+    fn try_place_bot(
+        &mut self,
+        (i, j): (usize, usize),
+        bot: Box<Organism>,
+    ) -> Result<(), Box<Organism>> {
         let mut directions = [
             Direction::Up,
             Direction::Down,
@@ -357,7 +382,7 @@ impl World {
                 return Ok(());
             }
         }
-        Err(())
+        Err(bot)
     }
 
     pub fn tick(&mut self) {
