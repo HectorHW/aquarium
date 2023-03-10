@@ -2,7 +2,7 @@ extern crate rand;
 
 use std::sync::Arc;
 
-use rand::distributions::Bernoulli;
+use rand::{distributions::Bernoulli, thread_rng, Rng};
 
 use std::thread;
 use std::time::Duration;
@@ -22,6 +22,8 @@ mod cachealloc;
 mod routes;
 mod serialization;
 use actix_web::{App, HttpServer};
+
+const PASSWORD_LETTERS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -47,6 +49,27 @@ async fn main() -> std::io::Result<()> {
         attack_cost: 10,
     };
 
+    let password = std::env::var("WEBUI_PASSWORD")
+        .ok()
+        .map(String::from)
+        .unwrap_or_else(|| {
+            let mut rng = thread_rng();
+            (0..20)
+                .map(|_| rng.gen_range(0..PASSWORD_LETTERS.len()))
+                .map(|idx| PASSWORD_LETTERS.as_bytes()[idx] as char)
+                .collect::<String>()
+        });
+
+    println!("webui password: {password}");
+
+    let instance_secret = {
+        let mut rng = thread_rng();
+        (0..40)
+            .map(|_| rng.gen_range(0..PASSWORD_LETTERS.len()))
+            .map(|idx| PASSWORD_LETTERS.as_bytes()[idx] as char)
+            .collect::<String>()
+    };
+
     let state = Arc::new(parking_lot::Mutex::new({
         let world = World::empty::<100, 50>(config);
         ServerState {
@@ -54,7 +77,8 @@ async fn main() -> std::io::Result<()> {
             target_tps: 0,
             stats: SpeedMeasure::new(),
             world,
-            password: "1234".to_string(),
+            password,
+            secret: instance_secret.clone(),
         }
     }));
 

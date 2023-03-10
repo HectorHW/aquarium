@@ -160,3 +160,13 @@ pub async fn load_world(state: Data<MState>, data: Json<WorldField>) -> impl Res
     state.world.field = data;
     HttpResponse::Ok()
 }
+
+#[post("/auth")]
+pub async fn auth(state: Data<MState>, password: Json<String>) -> impl Responder {
+    let state = state.lock();
+    if state.password == *password {
+        HttpResponse::Ok().json(&state.secret)
+    } else {
+        HttpResponse::Unauthorized().finish()
+    }
+}

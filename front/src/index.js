@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
+import Cookies from "js-cookie";
+
+const token_cookie_name = "aquarium_auth_token";
+
+var auth = Cookies.get(token_cookie_name);
 
 
 const params = new Proxy(new URLSearchParams(window.location.search), {
@@ -168,7 +173,7 @@ class PauseButton extends React.Component {
                         is_paused = !is_paused;
                     } else {
                         fetch(`${address}/pause`, {
-                            method: "POST",
+                            method: "POST"
                         }).then((response) => {
                             is_paused = response.headers.get('pause-state') === "1";
                         });
@@ -267,6 +272,35 @@ class SaveButton extends React.Component {
     }
 }
 
+class AuthBlock extends React.Component {
+    render() {
+        if (auth === undefined) {
+            return <button onClick={() => {
+                let pass = prompt("pass");
+                fetch(`${address}/auth`, {
+                    method: "POST",
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(pass)
+                })
+                    .then(response => response.json())
+                    .then(token => {
+                        Cookies.set(token_cookie_name, token)
+                        window.location.reload();
+                    });
+            }}>Login</button>
+        } else {
+            return <button onClick={
+                () => {
+                    Cookies.remove(token_cookie_name);
+                    window.location.reload();
+                }
+            }>logout</button>
+        }
+    }
+}
+
 class Header extends React.Component {
     render() {
         return <div className='top-panel'>
@@ -277,6 +311,7 @@ class Header extends React.Component {
             <ResetButton />
             <LoadButton />
             <SaveButton />
+            <AuthBlock />
         </div>
     }
 }

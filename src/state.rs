@@ -48,6 +48,7 @@ pub struct ServerState {
     pub stats: SpeedMeasure,
     pub world: World,
     pub password: String,
+    pub secret: String,
 }
 
 impl ServerState {
