@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use crate::{
     cells::world::{WorldCell, WorldField},
     serialization::store_world_shallow,
@@ -13,9 +15,17 @@ use actix_web::{
 #[get("/world")]
 pub async fn get_map(state: Data<MState>) -> impl Responder {
     let state = state.lock();
+
     let world = &state.world;
 
     Json(store_world_shallow(world))
+}
+
+#[post("/human")]
+pub async fn set_last_human(state: Data<MState>) -> impl Responder {
+    let mut state = state.lock();
+    state.last_human_request = Instant::now();
+    HttpResponse::Ok()
 }
 
 #[post("/pause")]
@@ -27,18 +37,6 @@ pub async fn pause(state: Data<MState>) -> impl Responder {
     HttpResponse::Ok()
         .append_header(("pause-state", format!("{}", i32::from(state.paused))))
         .body("")
-}
-
-#[post("/set-tps")]
-pub async fn set_tps(state: Data<MState>, tps: Json<u64>) -> HttpResponse {
-    if !(0..=1000).contains(&tps.0) {
-        return HttpResponse::BadRequest().body(format!("invalid tps value {}", tps));
-    }
-
-    let mut state = state.lock();
-    state.target_tps = tps.0;
-
-    HttpResponse::Ok().body(format!("set tps to {tps}"))
 }
 
 #[get("/inspect/{i}/{j}")]

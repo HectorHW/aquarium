@@ -1,6 +1,6 @@
 extern crate rand;
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use rand::{distributions::Bernoulli, thread_rng, Rng};
 
@@ -79,6 +79,7 @@ async fn main() -> std::io::Result<()> {
             world,
             password,
             secret: instance_secret.clone(),
+            last_human_request: Instant::now(),
         }
     }));
 
@@ -98,7 +99,11 @@ async fn main() -> std::io::Result<()> {
                     let world = &mut state.world;
                     world.tick();
                 }
-                tps = state.target_tps;
+                if (Instant::now() - state.last_human_request).as_secs_f64() > 2f64 {
+                    tps = 0;
+                } else {
+                    tps = 30;
+                }
             }
         })
     };

@@ -49,6 +49,7 @@ pub struct ServerState {
     pub world: World,
     pub password: String,
     pub secret: String,
+    pub last_human_request: Instant,
 }
 
 impl ServerState {

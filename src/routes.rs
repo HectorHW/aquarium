@@ -14,7 +14,6 @@ pub fn build_routes(state: AMState, base_path: &str) -> Scope {
 
     let api_protected = Scope::new("")
         .service(api::pause)
-        .service(api::set_tps)
         .service(api::spawn_random)
         .service(api::spawn_green)
         .service(api::tick)
@@ -47,6 +46,7 @@ pub fn build_routes(state: AMState, base_path: &str) -> Scope {
         .app_data(state)
         .service(api::auth)
         .service(api::get_map)
+        .service(api::set_last_human)
         .service(api::inspect)
         .service(api::stats)
         .service(api::save_world)

@@ -108,20 +108,6 @@ class AutoButton extends React.Component {
             onClick={
                 () => {
                     is_sync = !is_sync;
-                    fetch(`${address}/stats`)
-                        .then(response => response.json())
-                        .then(stats => {
-
-                            if (is_sync) {
-                                if (stats.is_paused == "0") {
-                                    fetch(`${address}/pause`, { method: "POST" });
-                                }
-                            } else {
-                                if (is_paused != (stats.is_paused == "1")) {
-                                    fetch(`${address}/pause`, { method: "POST" });
-                                }
-                            }
-                        })
                 }
             }> {button_text} </button>
     }
@@ -158,30 +144,14 @@ class SpawnMenu extends React.Component {
 
 class PauseButton extends React.Component {
     render() {
-
-        let button_text;
-        if (is_paused) {
-            button_text = "Paused";
-        } else {
-            button_text = "Unpaused";
-        }
-
         return <button className="title-button"
             onClick={
                 () => {
-                    if (is_sync) {
-                        is_paused = !is_paused;
-                    } else {
-                        fetch(`${address}/pause`, {
-                            method: "POST"
-                        }).then((response) => {
-                            is_paused = response.headers.get('pause-state') === "1";
-                        });
-                    }
-
-
+                    fetch(`${address}/pause`, {
+                        method: "POST"
+                    });
                 }
-            }>{button_text}</button>
+            }>Pause</button>
     }
 }
 
@@ -330,11 +300,10 @@ class Application extends React.Component {
     }
 }
 
-var is_sync = false;
+var is_sync = true;
 var is_paused = false;
 
 function tick() {
-
     function draw_world(response) {
         response.then(response => response.json()).then(
             data => {
@@ -345,12 +314,13 @@ function tick() {
             });
     }
 
-    if (is_sync && !is_paused) {
-        draw_world(fetch(`${address}/tick`, { method: "POST" }));
-        requestAnimationFrame(tick)
-    } else {
+    if (is_sync) {
+        fetch(`${address}/human`, { method: "POST" })
+    }
+
+    {
         draw_world(fetch(`${address}/world`));
-        setTimeout(() => requestAnimationFrame(tick), 500)
+        setTimeout(() => requestAnimationFrame(tick), 100)
     }
 }
 
