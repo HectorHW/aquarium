@@ -301,7 +301,13 @@ class Application extends React.Component {
 }
 
 var is_sync = true;
-var is_paused = false;
+
+function presence() {
+    if (is_sync) {
+        fetch(`${address}/human`, { method: "POST" })
+    }
+    setTimeout(presence, 500)
+}
 
 function tick() {
     function draw_world(response) {
@@ -314,26 +320,11 @@ function tick() {
             });
     }
 
-    if (is_sync) {
-        fetch(`${address}/human`, { method: "POST" })
-    }
-
     {
         draw_world(fetch(`${address}/world`));
         setTimeout(() => requestAnimationFrame(tick), 100)
     }
 }
 
-fetch(`${address}/stats`)
-    .then(response => response.json())
-    .then(
-        stats => {
-            if (stats.is_paused == "0") {
-                is_paused = false;
-            } else {
-                is_paused = true;
-            }
-        }
-    );
-
+presence()
 tick()
