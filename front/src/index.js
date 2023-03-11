@@ -271,6 +271,16 @@ class AuthBlock extends React.Component {
     }
 }
 
+class SettingsButton extends React.Component {
+    render() {
+        return <button onClick={
+            () => {
+                is_settings_shown = !is_settings_shown;
+            }
+        }>Settings</button>
+    }
+}
+
 class Header extends React.Component {
     render() {
         return <div className='top-panel'>
@@ -281,8 +291,25 @@ class Header extends React.Component {
             <ResetButton />
             <LoadButton />
             <SaveButton />
+            <SettingsButton />
             <AuthBlock />
         </div>
+    }
+}
+
+class SettingsBlock extends React.Component {
+    render() {
+        if (!is_settings_shown) {
+            return <br />
+        } else {
+            return <div>
+                Update delay (ms) <input type="number" defaultValue={parseInt(localStorage.getItem("refresh_interval")) || 100} id="update_delay_ms_field" />
+                <button className="defbtn" onClick={() => {
+                    let delay = document.getElementById("update_delay_ms_field").value;
+                    localStorage.setItem("refresh_interval", delay);
+                }}>apply</button>
+            </div>
+        }
     }
 }
 
@@ -293,7 +320,7 @@ class Application extends React.Component {
             <div>
                 <Header />
                 <Map cells={this.props.data.cells} />
-
+                <SettingsBlock />
             </div>
 
         );
@@ -301,6 +328,8 @@ class Application extends React.Component {
 }
 
 var is_sync = true;
+var is_settings_shown = false;
+
 
 function presence() {
     if (is_sync) {
@@ -322,7 +351,7 @@ function tick() {
 
     {
         draw_world(fetch(`${address}/world`));
-        setTimeout(() => requestAnimationFrame(tick), 100)
+        setTimeout(() => requestAnimationFrame(tick), parseInt(localStorage.getItem("refresh_interval")) || 100)
     }
 }
 
