@@ -64,19 +64,13 @@ pub enum OpCode {
     LookRelative,
 
     Eat,
-    Clone(u8),
+    Clone,
     Compare,
 
     UseMinerals,
     Share,
     ShareMinerals,
     Sythesize,
-}
-
-impl Default for OpCode {
-    fn default() -> Self {
-        OpCode::Sythesize
-    }
 }
 
 impl Distribution<OpCode> for Standard {
@@ -96,7 +90,7 @@ impl Distribution<OpCode> for Standard {
             9 => LookRelative,
 
             10 => OpCode::Eat,
-            11 => Clone(param),
+            11 => Clone,
             12 => Compare,
             13 => UseMinerals,
             14 => Share,
@@ -192,10 +186,7 @@ impl Display for Program {
                                 "look relative".to_string()
                             }
                             OpCode::Eat => "eat".to_string(),
-                            OpCode::Clone(size) => {
-                                let portion = *size as f64 / 256f64;
-                                format!("clone giving {:.2}% mass", portion * 100f64)
-                            }
+                            OpCode::Clone => "clone".to_string(),
                             OpCode::Sythesize => "photosynthesize".to_string(),
                             OpCode::Compare => "compare".to_string(),
                             OpCode::UseMinerals => "use minerals".to_string(),

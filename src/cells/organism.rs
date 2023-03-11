@@ -106,10 +106,7 @@ impl Organism {
         let code = Program::random_program();
         Organism {
             registers: [0; 16],
-            can_clone: code
-                .code
-                .iter()
-                .any(|gene| matches!(gene, OpCode::Clone(..))),
+            can_clone: code.code.iter().any(|gene| matches!(gene, OpCode::Clone)),
             code,
             energy,
             stored_minerals: 0,
@@ -127,7 +124,7 @@ impl Organism {
     fn with_program(energy: usize, minerals: usize, program: Program) -> Self {
         Organism {
             registers: [0; 16],
-            can_clone: program.iter().any(|gene| matches!(gene, OpCode::Clone(..))),
+            can_clone: program.iter().any(|gene| matches!(gene, OpCode::Clone)),
             code: program,
             energy,
             stored_minerals: minerals,
@@ -228,15 +225,11 @@ impl Organism {
                         self.next_instruction();
                     }
                 }
-                OpCode::Clone(inherit_rate) => {
+                OpCode::Clone => {
                     self.next_instruction();
-                    let child_energy = usize::max(
-                        world.config.start_energy,
-                        self.energy * inherit_rate as usize / 256usize / 2,
-                    );
+                    let child_energy = usize::max(world.config.start_energy, self.energy / 2);
 
-                    let child_minerals =
-                        self.stored_minerals * inherit_rate as usize / 256usize / 2;
+                    let child_minerals = self.stored_minerals / 2;
 
                     return Some(OrganismAction::TryClone(
                         child_energy,
