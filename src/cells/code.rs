@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::ops::Deref;
 
+use itertools::Itertools;
 use rand::distributions::{Bernoulli, Standard};
 use rand::prelude::Distribution;
 use rand::{thread_rng, Rng};
@@ -73,6 +74,58 @@ pub enum OpCode {
     Sythesize,
 }
 
+impl OpCode {
+    fn display_postioned(&self, idx: usize, codesize: usize) -> String {
+        format!(
+            "{: <4} {}",
+            idx,
+            match self {
+                OpCode::LoadInt(n) => format!("load int {}", n),
+                OpCode::CopyRegisters(addr) => {
+                    let (from, to) = addr.unwrap();
+                    format!("copy {to} <- {from}")
+                }
+                OpCode::Add(addr) => {
+                    let (from, to) = addr.unwrap();
+                    format!("add {to} <- {from}")
+                }
+                OpCode::AddClip(addr) => {
+                    let (from, to) = addr.unwrap();
+                    format!("add with clip {to} <- {from}")
+                }
+                OpCode::SubClip(addr) => {
+                    let (from, to) = addr.unwrap();
+                    format!("sub with clip {to} <- {from}")
+                }
+                OpCode::Flip(addr) => {
+                    let from = addr.unwrap();
+                    format!("flip register {from}")
+                }
+                OpCode::JumpUnconditional(shift) => {
+                    format!("jump {shift} (to {})", (idx + *shift as usize) % codesize)
+                }
+                OpCode::SkipZero(addr) => {
+                    let addr = addr.unwrap();
+                    format!("skip if register {addr} is 0")
+                }
+                OpCode::MoveRelative => {
+                    "move relative".to_string()
+                }
+                OpCode::LookRelative => {
+                    "look relative".to_string()
+                }
+                OpCode::Eat => "eat".to_string(),
+                OpCode::Clone => "clone".to_string(),
+                OpCode::Sythesize => "photosynthesize".to_string(),
+                OpCode::Compare => "compare".to_string(),
+                OpCode::UseMinerals => "use minerals".to_string(),
+                OpCode::Share => "share energy".to_string(),
+                OpCode::ShareMinerals => "share minerals".to_string(),
+            }
+        )
+    }
+}
+
 impl Distribution<OpCode> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> OpCode {
         use OpCode::*;
@@ -133,6 +186,42 @@ impl Program {
             *instruction = thread_rng().gen();
         }
     }
+
+    pub fn print_minimized(&self, mut ip: usize) -> String {
+        let mut markers = vec![false; 256];
+        let mut resume_point = vec![0];
+
+        while !markers[ip] || !resume_point.is_empty() {
+            if markers[ip] {
+                ip = resume_point.pop().unwrap();
+                continue;
+            }
+            markers[ip] = true;
+            match self.code[ip] {
+                OpCode::JumpUnconditional(offset) => {
+                    ip = (ip + offset as usize) % self.code.len();
+                }
+                OpCode::SkipZero(_) => {
+                    resume_point.push((ip + 1) % self.code.len());
+                    ip = (ip + 2) % self.code.len();
+                }
+                _ => {
+                    ip = (ip + 1) % self.code.len();
+                }
+            }
+        }
+
+        self.code
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, instr)| {
+                if !markers[idx] {
+                    return None;
+                }
+                Some(instr.display_postioned(idx, self.code.len()))
+            })
+            .join("\n")
+    }
 }
 
 impl Display for Program {
@@ -143,58 +232,7 @@ impl Display for Program {
             self.code
                 .iter()
                 .enumerate()
-                .map(|(idx, instr)| {
-                    format!(
-                        "{: <4} {}",
-                        idx,
-                        match instr {
-                            OpCode::LoadInt(n) => format!("load int {}", n),
-                            OpCode::CopyRegisters(addr) => {
-                                let (from, to) = addr.unwrap();
-                                format!("copy {to} <- {from}")
-                            }
-                            OpCode::Add(addr) => {
-                                let (from, to) = addr.unwrap();
-                                format!("add {to} <- {from}")
-                            }
-                            OpCode::AddClip(addr) => {
-                                let (from, to) = addr.unwrap();
-                                format!("add with clip {to} <- {from}")
-                            }
-                            OpCode::SubClip(addr) => {
-                                let (from, to) = addr.unwrap();
-                                format!("sub with clip {to} <- {from}")
-                            }
-                            OpCode::Flip(addr) => {
-                                let from = addr.unwrap();
-                                format!("flip register {from}")
-                            }
-                            OpCode::JumpUnconditional(shift) => {
-                                format!(
-                                    "jump {shift} (to {})",
-                                    (idx + *shift as usize) % self.code.len()
-                                )
-                            }
-                            OpCode::SkipZero(addr) => {
-                                let addr = addr.unwrap();
-                                format!("skip if register {addr} is 0")
-                            }
-                            OpCode::MoveRelative => {
-                                "move relative".to_string()
-                            }
-                            OpCode::LookRelative => {
-                                "look relative".to_string()
-                            }
-                            OpCode::Eat => "eat".to_string(),
-                            OpCode::Clone => "clone".to_string(),
-                            OpCode::Sythesize => "photosynthesize".to_string(),
-                            OpCode::Compare => "compare".to_string(),
-                            OpCode::UseMinerals => "use minerals".to_string(),
-                            OpCode::Share => "share energy".to_string(),
-                            OpCode::ShareMinerals => "share minerals".to_string(),
-                        }
-                    )
-                })
+                .map(|(idx, instr)| { instr.display_postioned(idx, self.code.len()) })
                 .collect::<Vec<String>>()
                 .join("\n")
         )

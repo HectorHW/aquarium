@@ -363,12 +363,17 @@ impl Display for Organism {
         write!(
             f,
             "
-        energy: {}
-        registers: {}
-        ip: {}
-        program: 
-        {}
-        ",
+energy: {}
+registers: {}
+ip: {}
+
+minimized program:
+
+{}
+
+full program:
+{}
+",
             self.get_energy(),
             self.registers
                 .iter()
@@ -376,6 +381,7 @@ impl Display for Organism {
                 .collect::<Vec<String>>()
                 .join(", "),
             self.ip,
+            self.code.print_minimized(self.ip),
             self.code
         )
     }
