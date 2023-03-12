@@ -1,16 +1,15 @@
 use std::time::Instant;
 
-use crate::{
-    cells::world::{WorldCell, WorldField},
-    serialization::store_world_shallow,
-    state::MState,
-};
+use crate::{cells::world::WorldCell, serialization::store_world_shallow, state::MState};
 
 use actix_web::{
+    error,
+    error::Error,
     get, post,
-    web::{Data, Json, Path},
+    web::{self, Data, Json, Path},
     HttpResponse, Responder,
 };
+use futures::StreamExt;
 
 #[get("/world")]
 pub async fn get_map(state: Data<MState>) -> impl Responder {
@@ -151,12 +150,27 @@ pub async fn save_world(state: Data<MState>) -> impl Responder {
     Json(world.field.clone())
 }
 
+const WORLD_SIZE_LIMIT: usize = 50_000_000;
+
 #[post("/load-world")]
-pub async fn load_world(state: Data<MState>, data: Json<WorldField>) -> impl Responder {
-    let data = data.0;
+pub async fn load_world(
+    state: Data<MState>,
+    mut body: actix_web::web::Payload,
+) -> Result<HttpResponse, Error> {
+    let mut bytes = web::BytesMut::with_capacity(WORLD_SIZE_LIMIT);
+    while let Some(item) = body.next().await {
+        let item = item?;
+        if bytes.len() > WORLD_SIZE_LIMIT {
+            return Err(error::ErrorBadRequest("overflow"));
+        }
+        bytes.extend_from_slice(&item);
+    }
+
+    let data = serde_json::from_slice(&bytes.freeze())
+        .map_err(|_| error::ErrorBadRequest("failed to deserialize payload"))?;
     let mut state = state.lock();
     state.world.field = data;
-    HttpResponse::Ok()
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[post("/auth")]

@@ -8,7 +8,7 @@ use std::thread;
 use std::time::Duration;
 use tokio::task;
 
-use cells::world::World;
+use cells::world::{World, WorldField};
 mod api;
 mod cells;
 
@@ -27,6 +27,9 @@ const PASSWORD_LETTERS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    ::std::env::set_var("RUST_LOG", "actix_web=debug");
+    env_logger::init();
+
     let config = WorldConfig {
         start_energy: 40,
         dead_energy: 20,
